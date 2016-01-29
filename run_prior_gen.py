@@ -95,8 +95,8 @@ spatial_mesh_size = findVIPVariable('spatial_mesh_size', vip)
 
 ### Select the data source to generate the observation files.
 if data_source == 1:
-    print "VIP file says to generate model observation files using the RUC/RAP historical data from the NOAA NOMADS server."
-    print "THIS METHOD IS NOT RECOMMENDED BECAUSE OF MISSING FILES ON THIS SERVER.  BEST USE THE ARM-FORMATTED FILES."
+    print "VIP file says to generate model observation files using the 13 km RAP historical data from the NOAA NOMADS server."
+    print "WARNING! Files are sometimes missing in random places on this server."
 elif data_source == 2:
     print "VIP file says to generate model observation files using ARM-formatted RUC/RAP files."
 elif data_source == 3:
@@ -114,19 +114,18 @@ print "Going to generate a model observation file for the times of: " + datetime
 
 if data_source == 1:
     # Using RUC/RAP historical data from the NOAA NOMADS server."
-    print "Not supported!"
-    sys.exit()
-    #mean, cov, climo, types, paths, date, hour, n = gmp.getOnlineModelPrior(climo_file, date, prior_spatial, hour, prior_temporal, lon, lat)
+    output = gmp.getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
+    output['arm_model_dir'] = 'n/a'
 elif data_source == 2:
     # Most often used for the 1998-2003 ARM Boundary Facilities dataset
     # Using ARM-formatted RUC/RAP files to generate the model "observations"
     arm_model_dir = findVIPVariable('arm_model_dir', vip)
     output = gmp.getARMModelObs(arm_model_dir, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat) 
     output['arm_model_dir'] = arm_model_dir
-    
 elif data_source == 3:
     # Using the MOTHERLODE UCAR datasets when getting realtime observations.
     output = gmp.getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
+    output['arm_model_dir'] = 'n/a'
 
 output['spatial_mesh_size'] = spatial_mesh_size
 output['temporal_mesh_size'] = temporal_mesh_size
