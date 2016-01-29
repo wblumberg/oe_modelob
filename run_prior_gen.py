@@ -87,18 +87,11 @@ if len(yyyymmdd) != 8:
  
 print "Reading in the VIP variables..."
 # Hardcoding these for debugging.
-#data_source = findVIPVariable('data_source', vip)
-data_source = 2
-#lat = findVIPVariable("aeri_lat", vip)
-lat = 35.22
-#lon = findVIPVariable("aeri_lon", vip)
-lon = -97.44
-#time_delta = findVIPVariable('time_delta', vip)
-time_delta = 2
-#spacex_delta = findVIPVariable('space_x_delta', vip)
-spacex_delta=10
-#spacey_delta = findVIPVariable('space_y_delta', vip)
-spacey_delta = 10
+data_source = findVIPVariable('data_source', vip)
+lat = findVIPVariable("aeri_lat", vip)
+lon = findVIPVariable("aeri_lon", vip)
+temporal_mesh_size = findVIPVariable('temporal_mesh_size', vip)
+spatial_mesh_size = findVIPVariable('spatial_mesh_size', vip)
 
 ### Select the data source to generate the observation files.
 if data_source == 1:
@@ -121,29 +114,18 @@ print "Going to generate a model observation file for the times of: " + datetime
 
 if data_source == 1:
     # Using RUC/RAP historical data from the NOAA NOMADS server."
-    mean, cov, climo, types, paths, date, hour, n = gmp.getOnlineModelPrior(climo_file, date, prior_spatial, hour, prior_temporal, lon, lat)
+    print "Not supported!"
+    sys.exit()
+    #mean, cov, climo, types, paths, date, hour, n = gmp.getOnlineModelPrior(climo_file, date, prior_spatial, hour, prior_temporal, lon, lat)
 elif data_source == 2:
     # Most often used for the 1998-2003 ARM Boundary Facilities dataset
     # Using ARM-formatted RUC/RAP files to generate the model "observations"
-    
-    #arm_model_dir = findVIPVariable('arm_model_dir', vip)
-    
-    # Hard coded inputs for debugging
-    arm_model_dir = '/raid/FRDD/Dave.Turner/data/SGP_BF5/ruc20km/'
-    spatial_mesh_size = 5
-    temporal_mesh_size = 2
-    
-    # Retrieve the data.
+    arm_model_dir = findVIPVariable('arm_model_dir', vip)
     output = gmp.getARMModelObs(arm_model_dir, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat) 
     output['arm_model_dir'] = arm_model_dir
     
 elif data_source == 3:
     # Using the MOTHERLODE UCAR datasets when getting realtime observations.
-    
-    # Hard coded inputs for debugging
-    spatial_mesh_size = 2
-    temporal_mesh_size = 2
-    
     output = gmp.getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
 
 output['spatial_mesh_size'] = spatial_mesh_size
@@ -152,7 +134,7 @@ output['aeri_lat'] = lat
 output['aeri_lon'] = lon
 
 # Get the path to write the converted model grid data into.
-output['model_prior_dir'] = './'#findVIPVariable('model_prior_dir', vip)
+output['output_dir'] = findVIPVariable('output_dir', vip).strip()
 
 # Output the converted data into a netCDF file.
 gmp.makeFile(output)

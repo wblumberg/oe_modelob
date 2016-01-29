@@ -525,13 +525,12 @@ def makeFile(output):
         Make the netCDF file!
     """
     epoch_time = date2num(output['dts'], 'seconds since 1979-01-01 00:00:00+00:00')
-    priorCDF_filename = output['model_prior_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
+    priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
     print "Saving prior file as: " + priorCDF_filename
 
     data = Dataset(priorCDF_filename, 'w', 'NETCDF3_CLASSIC')
 
     data.Date_created = datetime.strftime(datetime.now(), '%a %b %d %H:%M:%S %Y')
-    data.Version = 'get_model_prior.py'
     data.Machine_used = platform.platform()
     data.model = "RUC/RAP"
     #Need to include the web links to the data used to produce these files
