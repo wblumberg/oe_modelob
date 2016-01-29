@@ -11,10 +11,18 @@ import utils
 """
     Script Name: get_model_prior.py
     
+    Contains two primary parsing functions:
+    getARMProfiles() - which will parse out the profiles within a specified spatial domain
+                       for each ARM-formatted RUC/RAP model file.
+    getMotherlodeProfiles() - will parse out the profiles contained within the 13 km RAP grid
+                              (used for real-time model observations for AERIoe.)
+                              
+    Also contains two functions that call the parsing functions and control the files that 
+    get opened in order to create the model observation files for AERIoe.
 """
 
 def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
-  """
+    """
     This function is used to parse through ARM-formatted RAP/RUC analysis files that can be downloaded
     from the ARM Archive.  These files are primarily used to provide improved upper-air information
     to the AERIoe retrieval, but for only AERI deployments that took place in the SGP.
@@ -41,7 +49,7 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     Returns
     -------
 
-"""   
+    """   
     print "\tSearching for \"syn\" files."
     
     # Find files that have the "syn" in their filename
@@ -98,15 +106,16 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     center_sfc_rh = d.variables['rh2m'][0,idy,idx]
    
     # Find the indicies that correspond to the elements of the vertical grid that are above ground.
-    idx_aboveground = np.where(center_sfc_hght[index] < center_hght)[0]
+    idx_aboveground = np.where(center_sfc_hght < center_hght)[0]
         
     # Merge the 2 meter AGL variables with the rest of the above ground profile.
-    center_hght = (np.hstack((sfc_hght+2, hght[idx_aboveground])) - sfc_hght[index])/1000.
-    center_temp = np.hstack((sfc_temp, temp[idx_aboveground]))
-    center_rh = np.hstack((sfc_rh, rh[idx_aboveground]))
-    center_pres = np.hstack((sfc_pres, pres[idx_aboveground]))
-    center_q = utils.rh2q(center_temp, center_pres*100., center_rh/100.)*1000.
-        
+    center_hght = (np.hstack((center_sfc_hght+2, center_hght[idx_aboveground])) - center_sfc_hght)/1000.
+    center_temp = np.hstack((center_sfc_temp, center_temp[idx_aboveground]))
+    center_rh = np.hstack((center_sfc_rh, center_rh[idx_aboveground]))
+    center_pres = np.hstack((center_sfc_pres, pres[idx_aboveground]))
+    
+    center_q = 1000. * utils.rh2q(center_temp, center_pres*100., center_rh/100.)
+    
     # Close the ARM-formatted netCDF RAP/RUC file.
     d.close()
     
@@ -129,17 +138,19 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
         new_q = utils.rh2q(new_temp, new_pres*100., new_rh/100.)*1000.
         
         # Append the full ground to top of model profile to storage arrays.
-        mxrs.append(new_mxr)
+        mxrs.append(new_q)
         temps.append(new_temp)
         press.append(new_pres)
         hghts.append(new_hght)
-    
+        
     # Convert the storage arrays to Numpy arrays
     temps = np.asarray(temps)
     mxrs = np.asarray(mxrs)
     press = np.asarray(press)
     hghts = np.asarray(hghts)
-
+    
+    # TODO: figure out the format of the data that gets returned.
+    stop
     return
 
 def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
@@ -256,124 +267,25 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
     mxrs = np.asarray(mxrs)
     press = np.asarray(press)
     hghts = np.asarray(hghts)
-    
-    return temps, mxrs, press, type, path
-
-"""
-#This function searches for the RAP/RUC forecast data on the NOMADS THREDDS SERVER and builds a prior from it.
-def getHourlyProfiles(yyyymmddhh, fff, aeri_lat, aeri_lon, size, aerioe_hght):
-    #This function is used if the RAP data cannot be found on the Motherlode server.
-
-    rap_path = 'http://nomads.ncdc.noaa.gov/thredds/dodsC/rap130/' + yyyymmddhh[:6] + '/' + yyyymmddhh[:8] + \
-        '/rap_130_' + yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00_' + fff + '.grb2'
    
-    #ruc_path = 'http://nomads.ncdc.noaa.gov/thredds/dodsC/ruc252/' + yyyymmddhh[:6] + '/' + yyyymmddhh[:8] + \
-    #    '/ruc2_252_' + yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00_' + fff + '.grb'
-    
-    found = False
-    for i in range(1,6):
-        try:
-            print "Attempting to find: " + rap_path
-            d = Dataset(rap_path)
-            print "RAP 13 km data found."
-            type = "RAP13km"
-            path = rap_path
-            latlon_path = '13km_latlon.nc'
-            found = True
-            break
-        except:
-            print "Unable to find data on attempt " + str(i)
-            continue
-    if found == False:
-        for i in range(1,6):
-            try:
-                print "RAP data not found."
-                print "Attempting to find: " + ruc_path
-                d = Dataset(ruc_path)
-                print "RUC 20 km data found."
-                type = "RUC20km"
-                path = ruc_path
-                latlon_path = '20km_latlon.nc'
-                found = True
-                break
-            except:
-                print "Unable to find data on attempt " + str(i)
-                continue
-
-    if found == False:
-        print "Data not found on the server, aborting."
-        print yyyymmddhh + 'F' + fff
-        print "\n"
-        print "Maybe you should try using a GFS/CFS based prior instead?"
-        sys.exit()
-
-    try:
-        pres = d.variables['pressure'][:]
-    except:
-        pres = d.variables['isobaric'][:]*100.
-    
-    ll = Dataset(latlon_path)
-    lon = ll.variables['lon'][:]
-    lat = ll.variables['lat'][:]
-    idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
-    size = int(size)
-    temp =  d.variables['Temperature'][0,:,idy-size:idy+size,idx-size:idx+size]
-    rh = d.variables['Relative_humidity'][0,:,idy-size:idy+size,idx-size:idx+size]
-    hght = d.variables['Geopotential_height'][0,:,idy-size:idy+size,idx-size:idx+size]
-    
-    sfc_pres = d.variables['Pressure_surface'][0,idy-size:idy+size,idx-size:idx+size]
-    sfc_hght = d.variables['Geopotential_height_surface'][0,idy-size:idy+size,idx-size:idx+size]
-    sfc_temp = d.variables['Temperature_height_above_ground'][0,0,idy-size:idy+size,idx-size:idx+size]
-    sfc_rh = d.variables['Relative_humidity_height_above_ground'][0,0,idy-size:idy+size,idx-size:idx+size]
-    
-    d.close()
-    
-    mxrs = []
-    temps = []
-    press = []
-    rhs = []
-
-    for index, x in np.ndenumerate(sfc_hght):
-        idx_aboveground = np.where(sfc_hght[index] < hght[:,index[0], index[1]])[0]
-
-        new_hght = (np.hstack((sfc_hght[index]+2, hght[idx_aboveground, index[0], index[1]])) - sfc_hght[index])/1000.
-        new_temp = np.hstack((sfc_temp[index], temp[idx_aboveground, index[0], index[1]]))
-        new_rh = np.hstack((sfc_rh[index], rh[idx_aboveground, index[0], index[1]]))
-        new_pres = np.hstack((sfc_pres[index], pres[idx_aboveground]))
-                
-        new_q = utils.rh2q(new_temp, new_pres, new_rh/100.)*1000.
-        
-        oe_mxr = np.interp(aerioe_hght, new_hght, new_q)
-        oe_temp = np.interp(aerioe_hght, new_hght, new_temp)
-        oe_pres = np.interp(aerioe_hght, new_hght, new_pres)
-        oe_rh = np.interp(aerioe_hght, new_hght, new_rh)
-        mxrs.append(oe_mxr)
-        temps.append(oe_temp)
-        press.append(new_pres)
-        rhs.append(oe_rh)
-
-    temps = np.asarray(temps)
-    mxrs = np.asarray(mxrs)
-    rhs = np.asarray(rhs)
-
+    # TODO: Figure out the format of the data that gets returned by this function.
     return temps, mxrs, press, type, path
-"""
 
 # This the code that gets called by run_prior_gen.py when we want to make a prior out of the
 # ARM RUC/RAP MODEL DATA.
 def getARMModelPrior(model_data_path, climo_prior, yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
     print "This prior is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
-
-    climo = Dataset(climo_prior)
-    aerioe_hght = climo.variables['height'][:]
-
-    dt = datetime.strptime(yyyymmdd + hh, '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
-    end_dt = datetime.strptime(yyyymmdd + hh, '%Y%m%d%H') + timedelta(seconds=int(hh_delta)*60*60)
+    
+    dt = datetime.strptime(yyyymmdd + str(hh), '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
+    end_dt = datetime.strptime(yyyymmdd + str(hh), '%Y%m%d%H') + timedelta(seconds=int(hh_delta)*60*60)
     timed = timedelta(seconds=(60*60))
+    
     print "Will be searching for model netCDF files between: " + datetime.strftime(dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
+    
     all_temps = None
     all_mxrs = None
     all_pres = None
+    
     print "Gathering profiles within a " + str(2*size) + "x" + str(2*size) + " grid."
     types = []
     paths = []
@@ -382,7 +294,7 @@ def getARMModelPrior(model_data_path, climo_prior, yyyymmdd, size, hh, hh_delta,
         hour = datetime.strftime(dt, '%H')
         print "\nGathering profiles from this date/time: " + yyyymmdd + " @ " + hour
         # THE FIRST FUNCTION ABOVE GETS CALLED HERE
-        temp, mxr, pres, type, link = getARMProfiles(model_data_path, yyyymmdd, hour, aeri_lon, aeri_lat, size, aerioe_hght)
+        temp, mxr, pres, type, link = getARMProfiles(model_data_path, yyyymmdd, hour, aeri_lon, aeri_lat, size)
         if len(temp) == 1:
             print "\tWe weren't able to find any data from this date/time.  Let's skip it."
             dt = dt + timed
@@ -461,57 +373,6 @@ def getRealtimePrior(yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
     print "Sa: ", cov.shape
     return mean, cov, climo, types, paths, yyyymmdd, hh, priors.shape[0]
 
-
-# This is the code that gets called by run_prior_gen.py when we want to make a prior from
-# ONLINE RUC/RAP data.
-def getOnlineModelPrior(climo_prior, yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
-    #Load in latitude and longitude points for the RAP/RUC 13 km grid.
-    print "This prior is centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
-    
-    #Get the nearest grid point to the AERI location.
-
-    climo = Dataset(climo_prior)
-    aerioe_hght = climo.variables['height'][:]
-
-    dt = datetime.strptime(yyyymmdd + hh, '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
-
-    all_temps = None
-    all_mxrs = None
-    all_pres = None
-    print "Gathering profiles within a " + str(2*size) + "x" + str(2*size) + " grid."
-    types = []
-    paths = []
-    for i in range(0, int(hh_delta)*2,1):
-        dt_string = datetime.strftime(dt, '%Y%m%d%H')
-        forecast_hour = (3-len(str(i)))*'0' + str(i) 
-        print "Gathering profiles for model run on " + dt_string + " F" + forecast_hour
-        # This only searches the NOMADS THREDDS Server
-        temp, mxr, pres, type, link = getHourlyProfiles(dt_string, forecast_hour, aeri_lat, aeri_lon, size, aerioe_hght)
-        paths.append(link)
-        types.append(type)
-        
-        if all_temps is None:
-            all_temps = temp
-            all_mxrs = mxr
-            #all_pres = pres
-        else:
-            all_temps = np.vstack((all_temps, temp))
-            all_mxrs = np.vstack((all_mxrs, mxr))
-            #all_pres = np.vstack((all_pres, pres))
-
-    all_temps = all_temps - 273.15
-    print paths, types
-    print "Shape of the temperature profiles: ", all_temps.shape
-    print "Shape of the water vapor mixing ratio profiles: ", all_temps.shape
-    priors = np.hstack((all_temps, all_mxrs))
-    
-    print "Shape of the prior: ", priors.shape
-    mean = np.mean(priors, axis=0)
-    print "Xa: ", mean.shape
-    cov = np.cov(priors.T)
-    print "Sa: ", cov.shape
- 
-    return mean, cov, climo, types, paths, yyyymmdd, hh, priors.shape[0]
 
 def makeFile(mean, cov, dir, types, yyyymmdd, hh, paths, climo, size, t_size, n, aeri_lat, aeri_lon):
     """
@@ -609,37 +470,8 @@ def makeFile(mean, cov, dir, types, yyyymmdd, hh, paths, climo, size, t_size, n,
     return priorCDF_filename
 
 def main():
-    sfc_mutiplier = 3
-    yyyymmdd = '20130531'
-    hour = '12'
-    print "Testing RUC time frame"
-    mean, cov, climo, type, path, yyyymmdd, hh, n = getModelPrior('prior_data/Xa_Sa_datafile.55_levels.month_05.cdf', yyyymmdd, 10, hour, 3) 
-    fig = figure(figsize=(12,6))
-    subplot(121)
-    title("W/O Inflation " + yyyymmdd + ' ' + hour)
-    contourf(cov, np.arange(-14,15,1), cmap=get_cmap('RdBu'), extend='both')
-    axvline(x=55, c='k')
-    axhline(y=55, c='k')
+    print "END."
     
-    top = 3
-    d = Dataset('prior_data/Xa_Sa_datafile.55_levels.month_05.cdf')
-    height = d.variables['height'][:]
-    d.close()
-    profile_type = 2
-    new_cov = inflatePrior(cov, sfc_mutiplier, top, height, profile_type)
-    subplot(122)
-    title("Inflation " + yyyymmdd + ' ' + hour)
-    im = contourf(new_cov, np.arange(-14,15,1), cmap=get_cmap('RdBu'), extend='both')
-    axvline(x=55, c='k')
-    axhline(y=55, c='k')
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-    fig.colorbar(im, cax=cbar_ax)
-    show()
-    stop
-    print "Testing RUC time frame"
-    getModelPrior('prior_data/Xa_Sa_datafile.55_levels.month_08.cdf', "20110103", 10, "12", 3)
-
 if __name__ == '__main__':
     aeri_lon = -97
     aeri_lat = 35

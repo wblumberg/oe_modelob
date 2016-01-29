@@ -9,13 +9,15 @@ import time
 #
 #   AERIoe Model Observation Script
 #   Author: Greg Blumberg  OU/CIMMS
-#   
+#   Date Created: 1/28/2016
+#
 #   Recent changes to AERIoe by Dave Turner have included the option to 
 #   have a thermodynamic profile be a "Y-vector" observation in the retrieval.
 #   This facilitates the addition of radiosonde/Raman Lidar/DIAL data as inputs
 #   into the AERIoe retrieval.  As a consequence, we have decided to remove the
 #   AERI model prior concept from our processing and instead use a model thermodynamic
-#   profile into the AERIoe retrieval.  This script will perform the conversions
+#   profile as another "observation" into the AERIoe retrieval.  This enables a better
+#   retrieval in the mid-to-upper atmosphere.  This script will perform the conversions
 #   from the model grids into the model-profile netCDF files that AERIoe can now
 #   accept as inputs. 
 #   
@@ -23,7 +25,7 @@ import time
 #   (e.g. ARM-RUC grids or realtime RAP/HRRR data or NCDC archived RUC data
 #   or realtime GFS) and a lat/lon point.  It then pulls the temperature
 #   and water vapor mixing ratio profile for each time at that point to develop 
-#   a netCDF file.  The file contains the time/height data for temperature and   
+#   a netCDF file.  The output file contains the time/height data for temperature and   
 #   water vapor mixing ratio, pressure, height, temp_std, and wvmr_std.
 #   It also contains metadata about how the file was made.
 #
@@ -86,7 +88,7 @@ if len(yyyymmdd) != 8:
 print "Reading in the VIP variables..."
 # Hardcoding these for debugging.
 #data_source = findVIPVariable('data_source', vip)
-data_source = 3
+data_source = 2
 #lat = findVIPVariable("aeri_lat", vip)
 lat = 35.22
 #lon = findVIPVariable("aeri_lon", vip)
@@ -111,6 +113,7 @@ else:
     print "Invalid value for \"data_source\" variable in the VIP file, aborting program."
     sys.exit()
 
+# Convert the date/time strings into datetime objects for easier date/time manipulation
 begin_dt = datetime.strptime(yyyymmdd + bhour, '%Y%m%d%H')
 end_dt = datetime.strptime(yyyymmdd + ehour, '%Y%m%d%H')
 
@@ -122,23 +125,37 @@ if data_source == 1:
 elif data_source == 2:
     # Most often used for the 1998-2003 ARM Boundary Facilities dataset
     # Using ARM-formatted RUC/RAP files to generate the model "observations"
-    arm_model_dir = findVIPVariable('arm_model_dir', vip)
+    
+    #arm_model_dir = findVIPVariable('arm_model_dir', vip)
+    
+    # Hard coded inputs for debugging
+    arm_model_dir = '/raid/FRDD/Dave.Turner/data/SGP_BF5/ruc20km/'
+    climo_file = 'haha'
+    date = '20030508'
+    prior_spatial = 10
+    prior_temporal = 3
+    hour = 18
+    
     mean, cov, climo, types, paths, date, hour, n = gmp.getARMModelPrior(arm_model_dir, climo_file, date, prior_spatial, hour, prior_temporal, lon, lat) 
 elif data_source == 3:
     # Using the MOTHERLODE UCAR datasets when getting realtime observations.
+    
+    # Hard coded inputs for debugging
     date = '20160127'
     prior_spatial = 10
     prior_temporal = 3
     hour = '12'
     climo_file = 'haha'
+    
     mean, cov, climo, types, paths, date, hour, n = gmp.getRealtimePrior(climo_file, date, prior_spatial, hour, prior_temporal, lon, lat)
 
-stop
+print "This script is halting here now for debugging and will not generate the output file."
+sys.exit()
 
-# Get the path to the model directory.
+# Get the path to write the converted model grid data into.
 model_prior_dir = findVIPVariable('model_prior_dir', vip)
 
-# Make the prior file.
+# Output the converted data into a netCDF file.
 p = gmp.makeFile(mean, cov, model_prior_dir, types, yyyymmdd, hour, paths, climo, prior_spatial, prior_temporal*2., n, lat, lon)
 
 print "DONE."

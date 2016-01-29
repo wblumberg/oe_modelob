@@ -9,9 +9,16 @@ def find_index_of_nearest_xy(y_array, x_array, y_point, x_point):
 # This is used to convert between the relative humidity grid that is stored in the
 # model grids to mixing ratio (which is what we need for the prior)
 def rh2q(temp, pres, rh):
+    """
+        Inputs
+        ------
+        temp [K]
+        pres [Pa]
+        rh [fraction]
+    """
     Rv = 461.
     L = 2.453 * 10**6
     es = 6.11 * np.exp((L/Rv)*((1./(273.15)) - (1./temp)))
     e = rh * es
     q = (0.622*e) / ((pres/100.) - e)
-    return 
+    return q
