@@ -130,33 +130,32 @@ elif data_source == 2:
     
     # Hard coded inputs for debugging
     arm_model_dir = '/raid/FRDD/Dave.Turner/data/SGP_BF5/ruc20km/'
-    climo_file = 'haha'
-    date = '20030508'
-    prior_spatial = 10
-    prior_temporal = 3
-    hour = 18
+    spatial_mesh_size = 5
+    temporal_mesh_size = 2
     
-    mean, cov, climo, types, paths, date, hour, n = gmp.getARMModelPrior(arm_model_dir, climo_file, date, prior_spatial, hour, prior_temporal, lon, lat) 
+    # Retrieve the data.
+    output = gmp.getARMModelObs(arm_model_dir, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat) 
+    output['arm_model_dir'] = arm_model_dir
+    
 elif data_source == 3:
     # Using the MOTHERLODE UCAR datasets when getting realtime observations.
     
     # Hard coded inputs for debugging
-    date = '20160127'
-    prior_spatial = 10
-    prior_temporal = 3
-    hour = '12'
-    climo_file = 'haha'
+    spatial_mesh_size = 2
+    temporal_mesh_size = 2
     
-    mean, cov, climo, types, paths, date, hour, n = gmp.getRealtimePrior(climo_file, date, prior_spatial, hour, prior_temporal, lon, lat)
+    output = gmp.getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
 
-print "This script is halting here now for debugging and will not generate the output file."
-sys.exit()
+output['spatial_mesh_size'] = spatial_mesh_size
+output['temporal_mesh_size'] = temporal_mesh_size
+output['aeri_lat'] = lat
+output['aeri_lon'] = lon
 
 # Get the path to write the converted model grid data into.
-model_prior_dir = findVIPVariable('model_prior_dir', vip)
+output['model_prior_dir'] = './'#findVIPVariable('model_prior_dir', vip)
 
 # Output the converted data into a netCDF file.
-p = gmp.makeFile(mean, cov, model_prior_dir, types, yyyymmdd, hour, paths, climo, prior_spatial, prior_temporal*2., n, lat, lon)
+gmp.makeFile(output)
 
 print "DONE."
 

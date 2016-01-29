@@ -1,4 +1,4 @@
-from netCDF4 import Dataset
+from netCDF4 import Dataset, date2num
 #from pylab import *
 import numpy as np
 import sys
@@ -20,6 +20,9 @@ import utils
     Also contains two functions that call the parsing functions and control the files that 
     get opened in order to create the model observation files for AERIoe.
 """
+ 
+# Height grid to interpolate the RAP/RUC profiles to:
+height_grid = np.arange(0.002, 17, 0.1)
 
 def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     """
@@ -68,19 +71,22 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     # Ensure that the file found can be opened up.
     try:
          # Tell the user that data has been found
-        print "\t\tFOUND DATA FOR PRIOR: " + files[0]
+        print "\t   Found data: " + files[0]
         d = Dataset(files[0])
     except:
         # Give messages to the user that the file couldn't be found or opened.
         # Return error codes.
-        print "\t\tUnable to find ARM data to generate prior."
-        print "\t\tARM RAP/RUC \"syn\" data needs to be in the directory: " + rap_path
-        print "\t\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
-        return
+        print "\tWARNING!!!"
+        print "\tUnable to find ARM-formatted RAP/RUC dataset."
+        print "\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        return None, None
         
     # Grab the latitude/longitude grid stored in the ARM-formatted model grid file
     lon = d.variables['longitude'][:]
     lat = d.variables['latitude'][:]
+   
+    # Tell the user that the data is being read.
+    print "\tReading in the data and converting it..."
     
     # Find the indices associated with the grid point nearest to the instrument.
     idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
@@ -143,17 +149,28 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
         press.append(new_pres)
         hghts.append(new_hght)
         
-    # Convert the storage arrays to Numpy arrays
-    temps = np.asarray(temps)
-    mxrs = np.asarray(mxrs)
-    press = np.asarray(press)
-    hghts = np.asarray(hghts)
+    # Store these arrays into the distribution_profiles dictionary
+    distribution_profiles = {}
+    distribution_profiles['temp'] = np.asarray(temps)
+    distribution_profiles['wvmr'] = np.asarray(mxrs)
+    distribution_profiles['pres'] = np.asarray(press)
+    distribution_profiles['hght'] = np.asarray(hghts)
+    distribution_profiles['path_to_data'] = files[0].split('/')[-1]
     
-    # TODO: figure out the format of the data that gets returned.
-    stop
-    return
+    # Tell the user how many profiles were found from this:
+    print "\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.'
+    
+    point_profile = {}
+    point_profile['temp'] = center_temp
+    point_profile['wvmr'] = center_q
+    point_profile['pres'] = center_pres
+    point_profile['hght'] = center_hght
+    point_profile['lat'] = lat[idy, idx]
+    point_profile['lon'] = lon[idy, idx]
+    
+    return distribution_profiles, point_profile
 
-def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
+def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_lon, size):
     """
     This function is used to parse through RAP data located on the THREDDS Motherlode server
     
@@ -182,7 +199,6 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
 """
     recent_rap_path = 'http://thredds.ucar.edu/thredds/dodsC/grib/NCEP/RAP/CONUS_13km/RR_CONUS_13km_' + \
         yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00.grib2/GC'
-    print recent_rap_path
     try:
         d = Dataset(recent_rap_path)
         print "Found 13 km RAP data for this date on the Motherlode UCAR server."
@@ -191,7 +207,7 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
     except:
         print "No RAP data found for this date on the Motherlode UCAR server."
         print "Data Path:", recent_rap_path
-        return None
+        return None, None
     
     # Read in the terrain data and the lat,lon grid for the 13 km RAP grid.
     ll = Dataset('13km_latlon.nc')
@@ -207,33 +223,32 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
 
     # Read in the 13 km RAP data for parsing.
     pres = d.variables['isobaric'][:] #Pascals
-    temp =  d.variables['Temperature_isobaric'][:time_window,:,idy-size:idy+size,idx-size:idx+size] # 
-    center_temp =  d.variables['Temperature_isobaric'][:time_window,:,idy, idx] # 
-    rh = d.variables['Relative_humidity_isobaric'][:time_window,:,idy-size:idy+size,idx-size:idx+size]
-    center_rh = d.variables['Relative_humidity_isobaric'][:time_window,:,idy, idx]
-    hght = d.variables['Geopotential_height_isobaric'][:time_window,:,idy-size:idy+size,idx-size:idx+size]
-    center_hght = d.variables['Geopotential_height_isobaric'][:time_window,:,idy ,idx]
-    sfc_pres = d.variables['Pressure_surface'][:time_window, idy-size:idy+size,idx-size:idx+size]  #Pascals
-    center_sfc_pres = d.variables['Pressure_surface'][:time_window, idy, idx]  #Pascals
+    temp =  d.variables['Temperature_isobaric'][begin_window:end_window,:,idy-size:idy+size,idx-size:idx+size] # 
+    center_temp =  d.variables['Temperature_isobaric'][begin_window:end_window,:,idy, idx] # 
+    rh = d.variables['Relative_humidity_isobaric'][begin_window:end_window,:,idy-size:idy+size,idx-size:idx+size]
+    center_rh = d.variables['Relative_humidity_isobaric'][begin_window:end_window,:,idy, idx]
+    hght = d.variables['Geopotential_height_isobaric'][begin_window:end_window,:,idy-size:idy+size,idx-size:idx+size]
+    center_hght = d.variables['Geopotential_height_isobaric'][begin_window:end_window,:,idy ,idx]
+    sfc_pres = d.variables['Pressure_surface'][begin_window:end_window, idy-size:idy+size,idx-size:idx+size]  #Pascals
+    center_sfc_pres = d.variables['Pressure_surface'][begin_window:end_window, idy, idx]  #Pascals
     sfc_hght = ll.variables['Geopotential_height_surface'][idx-size:idx+size, idy-size:idy+size]
     center_sfc_hght = ll.variables['Geopotential_height_surface'][idx, idy]
     #sfc_hght = d.variables['Geopotential_height_surface'][:time_window, idy-size:idy+size,idx-size:idx+size]
-    sfc_temp = d.variables['Temperature_height_above_ground'][:time_window,0, idy-size:idy+size,idx-size:idx+size]
-    center_sfc_temp = d.variables['Temperature_height_above_ground'][:time_window,0, idy, idx]
-    sfc_rh = d.variables['Relative_humidity_height_above_ground'][:time_window,0, idy-size:idy+size,idx-size:idx+size]
-    center_sfc_rh = d.variables['Relative_humidity_height_above_ground'][:time_window,0, idy, idx]
+    sfc_temp = d.variables['Temperature_height_above_ground'][begin_window:end_window,0, idy-size:idy+size,idx-size:idx+size]
+    center_sfc_temp = d.variables['Temperature_height_above_ground'][begin_window:end_window,0, idy, idx]
+    sfc_rh = d.variables['Relative_humidity_height_above_ground'][begin_window:end_window,0, idy-size:idy+size,idx-size:idx+size]
+    center_sfc_rh = d.variables['Relative_humidity_height_above_ground'][begin_window:end_window,0, idy, idx]
    
     # Merge the model profile data together to get the thermodynamic profile nearest to the AERI location.
     hght_prof = center_hght[0, :]
     idx_aboveground = np.where(pres < center_sfc_pres[0])[0]
-    point_hght = np.hstack((center_sfc_hght+2, center_hght[0, idx_aboveground][::-1]))
-    new_temp = np.hstack((center_sfc_temp[0], center_temp[0, idx_aboveground][::-1]))
-    new_rh = np.hstack((center_sfc_rh[0], center_rh[0, idx_aboveground][::-1]))
-    new_pres = np.hstack((center_sfc_pres[0], pres[idx_aboveground][::-1]))
-    new_q = utils.rh2q(new_temp, new_pres, new_rh/100.)*1000.
-   
-    # Close the terrain dataset and the 13 km RAP dataset.
-    ll.close()
+    center_hght = (np.hstack((center_sfc_hght+2, center_hght[0, idx_aboveground][::-1])) - center_sfc_hght+2)/1000.
+    center_temp = np.hstack((center_sfc_temp[0], center_temp[0, idx_aboveground][::-1]))
+    center_rh = np.hstack((center_sfc_rh[0], center_rh[0, idx_aboveground][::-1]))
+    center_pres = np.hstack((center_sfc_pres[0], pres[idx_aboveground][::-1]))
+    center_q = utils.rh2q(center_temp, center_pres, center_rh/100.)*1000.
+    
+    # Close the 13 km RAP dataset.
     d.close()
     
     # Intitalize the profile storage arrays.
@@ -248,7 +263,7 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
         for index, x in np.ndenumerate(sfc_hght):
             # Merge the 2 meter AGL variables with the rest of the upper air profile.
             idx_aboveground = np.where(sfc_hght[index] < hght_prof)[0]
-            new_hght = np.hstack((sfc_hght[index[1], index[0]]+2, hght[t, idx_aboveground, index[0], index[1]][::-1]))
+            new_hght = (np.hstack((sfc_hght[index[1], index[0]]+2, hght[t, idx_aboveground, index[0], index[1]][::-1])) - sfc_hght[index[1], index[0]]+2)/1000.
             new_temp = np.hstack((sfc_temp[t, index[0], index[1]], temp[t, idx_aboveground, index[0], index[1]][::-1]))
             new_rh = np.hstack((sfc_rh[t, index[0], index[1]], rh[t, idx_aboveground, index[0], index[1]][::-1]))
             new_pres = np.hstack((sfc_pres[t, index[0], index[1]], pres[idx_aboveground][::-1]))
@@ -260,127 +275,257 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
             press.append(new_pres)
             hghts.append(new_hght)
             
-    # Dimensions of these Numpy arrays may be only 1-D instead of 2-D as the grid length when merging
-    # the surface and upper air data together may not be equal across all grid profiles within the user-selected
-    # mesh.
-    temps = np.asarray(temps)
-    mxrs = np.asarray(mxrs)
-    press = np.asarray(press)
-    hghts = np.asarray(hghts)
-   
-    # TODO: Figure out the format of the data that gets returned by this function.
-    return temps, mxrs, press, type, path
+    # Store these arrays into the distribution_profiles dictionary
+    distribution_profiles = {}
+    distribution_profiles['temp'] = np.asarray(temps)
+    distribution_profiles['wvmr'] = np.asarray(mxrs)
+    distribution_profiles['pres'] = np.asarray(press)
+    distribution_profiles['hght'] = np.asarray(hghts)
+    distribution_profiles['path_to_data'] = recent_rap_path
+    
+    point_profile = {}
+    point_profile['temp'] = center_temp
+    point_profile['wvmr'] = center_q
+    point_profile['pres'] = center_pres
+    point_profile['hght'] = center_hght
+    point_profile['lat'] = ll.variables['lat'][idy, idx]
+    point_profile['lon'] = ll.variables['lon'][idy, idx]
+    
+    # Close the terrain dataset.
+    ll.close()
+    
+    return distribution_profiles, point_profile
 
-def getARMModelPrior(model_data_path, climo_prior, yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
+def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
         LEFT OVER CODE THAT CONTROLS WHICH ARM-formatted RAP/RUC FILES GET USED IN THE PRIOR GENERATON
     '''
-    print "This prior is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
     
-    dt = datetime.strptime(yyyymmdd + str(hh), '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
-    end_dt = datetime.strptime(yyyymmdd + str(hh), '%Y%m%d%H') + timedelta(seconds=int(hh_delta)*60*60)
-    timed = timedelta(seconds=(60*60))
+    # Tell the user what the range of data the program will look for.
+    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
+    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+
+    # Determine the temporal bounds of the data we need to collect.
+    lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
+    upper_bound_dt = end_dt + timedelta(seconds=60*60*temporal_mesh_size)
     
-    print "Will be searching for model netCDF files between: " + datetime.strftime(dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
+    # Arrays to store dictionaries 
+    num_times = (upper_bound_dt - lower_bound_dt).seconds * (1./3600.) + (upper_bound_dt - lower_bound_dt).days * 24
+    dists = np.empty(num_times+1, dtype=dict)
+    points = np.empty(num_times+1, dtype=dict)
+    dts = np.empty(num_times+1, dtype=object)
     
-    all_temps = None
-    all_mxrs = None
-    all_pres = None
+    # Begin looping over the time frame the observation files encompass.
+    # Save the data into the numpy arrays.
+    cur_dt = lower_bound_dt
+    count = 0
     
-    print "Gathering profiles within a " + str(2*size) + "x" + str(2*size) + " grid."
-    types = []
     paths = []
-    while dt < end_dt:
-        yyyymmdd = datetime.strftime(dt, '%Y%m%d')
-        hour = datetime.strftime(dt, '%H')
-        print "\nGathering profiles from this date/time: " + yyyymmdd + " @ " + hour
-        # THE FIRST FUNCTION ABOVE GETS CALLED HERE
-        temp, mxr, pres, type, link = getARMProfiles(model_data_path, yyyymmdd, hour, aeri_lon, aeri_lat, size)
-        if len(temp) == 1:
-            print "\tWe weren't able to find any data from this date/time.  Let's skip it."
-            dt = dt + timed
+    while cur_dt <= upper_bound_dt :
+        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        dist, point = getARMProfiles(model_data_path, datetime.strftime(cur_dt, '%Y%m%d'), datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, spatial_mesh_size)
+        paths.append(dist['path_to_data'])
+        dists[count] = dist
+        points[count] = point
+        dts[count] = cur_dt
+        cur_dt = cur_dt + delta
+        count = count + 1
+    
+    paths = ', '.join(paths)
+    
+    temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    temperature_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    
+    output = {}
+    # Loop over the timeframe.
+    for i in np.arange(temporal_mesh_size, len(dts) - temporal_mesh_size, 1):
+        index_range = np.arange(i - temporal_mesh_size, i+temporal_mesh_size+1, 1)
+        
+        # Try to save the interpolated temperature, water vapor mixing ratio, and pressure profiles
+        try:
+            temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
+            wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
+            pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
+        except Exception,e:
+            # If there's an issue with loading in the data for this time, then this exception will catch it.
+            # this will skip calculating the standard deviation too, because we won't need that.
+            print e
             continue
-        else:
-            print "\tWe were able to find data from this date/time.  Let's save it."
-        paths.append(link)
-        types.append(type)
-        if all_temps is None:
-            all_temps = temp
-            all_mxrs = mxr
-            #all_pres = pres
-        else:
-            all_temps = np.vstack((all_temps, temp))
-            all_mxrs = np.vstack((all_mxrs, mxr))
-            #all_pres = np.vstack((all_pres, pres))
-        dt = dt + timed
+        
+        # Pull out the latitude and longitude point.
+        lat = points[i]['lat']
+        lon = points[i]['lon']
+        
+        temp_dist = []
+        wvmr_dist = []
+        # Loop over the temporal window we'll be using to calculate the standard deviation.
+        for j in index_range:
+            # Loop over the spatial distribution of profiles for time index j.
+            for k in range(len(dists[i]['temp'])):
+                # Interpolate the profiles and save to the array used in calculating the standard deviation.
+                temp_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['temp'][k]))
+                wvmr_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['wvmr'][k]))
+        # Calculate the standard deviation profiles for temperature and water vapor mixing ratio and save it.
+        temp_std = np.std(np.asarray(temp_dist), axis=0)
+        wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
+        temperature_sigma[i-temporal_mesh_size,:] = temp_std
+        wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
+        
+    output['temperature'] = temperature
+    output['wvmr'] = wvmr
+    output['temperature_sigma'] = temperature_sigma
+    output['wvmr_sigma'] = wvmr_sigma
+    output['height'] = height_grid
+    output['pressure'] = pressure
+    output['paths_to_data'] = paths
+    output['gridpoint_lat'] = lat
+    output['gridpoint_lon'] = lon
+    output['data_type'] = np.ones(len(temperature))
+    output['dts'] = dts[temporal_mesh_size:len(dts)-temporal_mesh_size]
     
-    
-    all_temps = all_temps - 273.15
-    print "\nThese files were used in calculating this prior:"
-    for p in paths:
-        print '\t' + p
-    print "\nInformation about the profiles found:"
-    print "\tShape of the temperature profiles: ", all_temps.shape
-    print "\tShape of the water vapor mixing ratio profiles: ", all_temps.shape
-    if all_temps.shape[0] < 2000:
-        print "WARNING!  THERE ARE LESS THAN 2000 PROFILES FOR THIS PRIOR."
-        print "RUC/RAP ARM files are probably missing.  Canceling the generation of this prior."
-        sys.exit()
-    priors = np.hstack((all_temps, all_mxrs))
-    
-    mean = np.mean(priors, axis=0)
-    print "Xa SHAPE: ", mean.shape
-    cov = np.cov(priors.T)
-    print "Sa SHAPE: ", cov.shape
- 
-    return mean, cov, climo, types, paths, yyyymmdd, hh, priors.shape[0]
+    return output
 
 # This is the code that gets called by run_prior_gen.py when we want to make a prior from
 # ONLINE MOTHERLODE data. It should be used only for realtime prior generation for AERIoe.
 # THIS PART OF THE CODE DOES THE REALTIME DATASET GENERATION
-def getRealtimePrior(yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
+def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
         Function that gets called when we want to grab data from the Motherlode site.
         used to generate semi-realtime model profiles for use in AERIoe.
     '''
+    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
     
-    print "Will be pulling observations from the nearest point to: " + str(aeri_lat) + ', ' + str(aeri_lon)
-    print hh_delta, yyyymmdd, hh
-    dt = datetime.strptime(yyyymmdd + hh, '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
+    # Tell the user what the range of data the program will look for.
+    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
+    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
 
-    all_temps = None
-    all_mxrs = None
-    all_pres = None
-    print "Gathering profiles within a " + str(2*size) + "x" + str(2*size) + " grid."
-    types = []
+    # Determine the temporal bounds of the data we need to collect.
+    lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
+    upper_bound_dt = end_dt + timedelta(seconds=60*60*temporal_mesh_size)
+    
+    # Arrays to store dictionaries 
+    num_times = (upper_bound_dt - lower_bound_dt).seconds * (1./3600.) + (upper_bound_dt - lower_bound_dt).days * 24
+    dists = np.empty(num_times+24, dtype=dict)
+    points = np.empty(num_times+24, dtype=dict)
+    dts = []
+    
+    # Begin looping over the time frame the observation files encompass.
+    # Save the data into the numpy arrays.
+    cur_dt = lower_bound_dt
+    count = 0
+    
     paths = []
-    dt_string = datetime.strftime(dt, '%Y%m%d%H')
+    data_type = []
+    use_forecast = False
+    # Get all of the analysis profiles
+    while cur_dt <= upper_bound_dt :
+        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), 0, 1, aeri_lat, aeri_lon, spatial_mesh_size)
+        if dist == None:
+            # This means that a file couldn't be found for this time.
+            # This means that we should break the loop because no data for this hour is available.
+            # This also means that we should use forecast data to fill in the distribution
+            print "Unable to find:", cur_dt
+            use_forecast = True
+            break
+        data_type.append(1) # Means that this an analysis
+        paths.append(dist['path_to_data'])
+        dists[count] = dist
+        points[count] = point
+        dts.append(cur_dt)
+        cur_dt = cur_dt + delta
+        count = count + 1
     
-    # Searches the MOTHERLODE UCAR THREDDS Server
-    all_temps, all_mxrs, all_pres, type, link = getMotherlodeProfiles(dt_string, int(hh_delta)*2, aeri_lat, aeri_lon)
-    paths = [link]
-    types.append(type)
+    if use_forecast == True:
+        # Go back to the last file that actually existed and had data
+        cur_dt = cur_dt - delta 
 
-    all_temps = all_temps - 273.15
-    print paths, types
-    print "Shape of the temperature profiles: ", all_temps.shape
-    print "Shape of the water vapor mixing ratio profiles: ", all_temps.shape
-    priors = np.hstack((all_temps, all_mxrs))
+        # Get all of the forecast profiles from that file.
+        for i in range(temporal_mesh_size):
+            dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), i, i+1, aeri_lat, aeri_lon, spatial_mesh_size)
+            data_type.append(2) # Means that this a forecast value
+            paths.append(dist['path_to_data'])
+            dists[count+i] = dist
+            points[count+i] = point
+            dts.append(cur_dt+delta)
+            count = count + 1
+            
+    # Filter out the array elements that were never filled with profile information.
+    idx_filter = [i for i, item in enumerate(points) if item is not None]
+    points = points[idx_filter]
+    dists = dists[idx_filter]
+
+    paths = ', '.join(paths)
     
-    print "Shape of the prior: ", priors.shape
-    mean = np.mean(priors, axis=0)
-    print "Xa: ", mean.shape
-    cov = np.cov(priors.T)
-    print "Sa: ", cov.shape
-    return mean, cov, climo, types, paths, yyyymmdd, hh, priors.shape[0]
+    # Set up final data arrays to be saved to the file.
+    temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    temperature_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    
+    output = {}
+    # Loop over the timeframe.
+    for i in np.arange(temporal_mesh_size, len(dts) - temporal_mesh_size, 1):
+        index_range = np.arange(i - temporal_mesh_size, i+temporal_mesh_size+1, 1)
+        
+        # Try to save the interpolated temperature, water vapor mixing ratio, and pressure profiles
+        try:
+            temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
+            wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
+            pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
+        except Exception,e:
+            # If there's an issue with loading in the data for this time, then this exception will catch it.
+            # this will skip calculating the standard deviation too, because we won't need that.
+            print e
+            continue
+        
+        # Pull out the latitude and longitude point.
+        lat = points[i]['lat']
+        lon = points[i]['lon']
+        
+        temp_dist = []
+        wvmr_dist = []
+        # Loop over the temporal window we'll be using to calculate the standard deviation.
+        for j in index_range:
+            # Loop over the spatial distribution of profiles for time index j.
+            for k in range(len(dists[i]['temp'])):
+                # Interpolate the profiles and save to the array used in calculating the standard deviation.
+                temp_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['temp'][k]))
+                wvmr_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['wvmr'][k]))
+        # Calculate the standard deviation profiles for temperature and water vapor mixing ratio and save it.
+        temp_std = np.std(np.asarray(temp_dist), axis=0)
+        wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
+        temperature_sigma[i-temporal_mesh_size,:] = temp_std
+        wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
+
+    output['temperature'] = temperature
+    output['wvmr'] = wvmr
+    output['temperature_sigma'] = temperature_sigma
+    output['wvmr_sigma'] = wvmr_sigma
+    output['height'] = height_grid
+    output['pressure'] = pressure
+    output['paths_to_data'] = paths
+    output['gridpoint_lat'] = lat
+    output['gridpoint_lon'] = lon
+    output['data_type'] = data_type
+    output['dts'] = np.unique(dts[temporal_mesh_size:len(dts)-temporal_mesh_size])
+   
+    return output
 
 
-def makeFile(mean, cov, dir, types, yyyymmdd, hh, paths, climo, size, t_size, n, aeri_lat, aeri_lon):
+def makeFile(output):
     """
-        Make the netCDF Prior file!
+        Make the netCDF file!
     """
-    
-    priorCDF_filename = dir.strip() + '/Xa_Sa_datafile.55_levels.' + yyyymmdd + '.' + hh + '.' + types[0] + '.' + str(aeri_lat) + '.' + str(aeri_lon) + '.cdf'
+    epoch_time = date2num(output['dts'], 'seconds since 1979-01-01 00:00:00+00:00')
+    priorCDF_filename = output['model_prior_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
     print "Saving prior file as: " + priorCDF_filename
 
     data = Dataset(priorCDF_filename, 'w', 'NETCDF3_CLASSIC')
@@ -389,84 +534,72 @@ def makeFile(mean, cov, dir, types, yyyymmdd, hh, paths, climo, size, t_size, n,
     data.Version = 'get_model_prior.py'
     data.Machine_used = platform.platform()
     data.model = "RUC/RAP"
-    data.LBL_HOME = climo.LBL_HOME
-    data.Standard_atmos = climo.Standard_atmos
-    data.QC_limits_T = climo.QC_limits_T
-    data.QC_limits_q = climo.QC_limits_q
-    data.Comment = "Prior generated using model (" + types[0] + ") data."
     #Need to include the web links to the data used to produce these files
     #Need to include the times used to produce this file.
-    data.Nsonde = str(n) + ' profiles were included in the computation of this prior dataset.'
-    data.lat = aeri_lat
-    data.lon = aeri_lon
-    data.paths = '; '.join(paths)
-    data.model_types = '; '.join(types)
-    data.domain_size = str(2*size) + "x" + str(2*size)
-    data.temporal_size = t_size
-    data.grid_spacing = '13 km'
+    data.aeri_lat = output['aeri_lat']
+    data.aeri_lon = output['aeri_lon']
+    data.gridpoint_lat = output['gridpoint_lat']
+    data.gridpoint_lon = output['gridpoint_lon']
+    data.paths = output['paths_to_data']
+    data.domain_size = str(2*output['spatial_mesh_size']) + "x" + str(2*output['spatial_mesh_size'])
+    data.temporal_size = output['temporal_mesh_size']
 
     print "Prior generation took place at: ", data.Date_created
 
-    data.createDimension('height', len(mean)/2)
-    data.createDimension('wnum', len(climo.variables['wnum'][:]))
-    data.createDimension('height2', len(mean))
+    data.createDimension('time', len(output['temperature']))
+    data.createDimension('height', len(output['height']))
 
-    var = data.createVariable('mean_pressure', 'f4', ('height',))
-    var[:] = climo.variables['mean_pressure'][:]
-    var.units = climo.variables['mean_pressure'].units
-    var.long_name = climo.variables['mean_pressure'].long_name
+    var = data.createVariable('base_time', 'i4')
+    var[:] = epoch_time[0]
+    var.units = 'seconds since 1970-01-01 00:00:00+00:00'
+    var.long_name = 'epoch time'
 
+    var = data.createVariable('time_offset', 'f4', ('time',))
+    var[:] = epoch_time - epoch_time[0]
+    var.units = 's'
+    var.long_name = 'Time offset from base_time'
+    
     var = data.createVariable('height', 'f4', ('height',))
-    var[:] = climo.variables['height'][:]
-    var.units = climo.variables['height'].units
-    var.long_name = climo.variables['height'].long_name
+    var[:] = output['height']
+    var.units = 'km AGL'
+    var.long_name = 'height grid of the sounding'
 
-    var = data.createVariable('mean_temperature', 'f4', ('height',))
-    var[:] = mean[:55]
-    var.units = climo.variables['mean_temperature'].units
-    var.long_name = climo.variables['mean_temperature'].long_name
+    var = data.createVariable('temperature', 'f4', ('time','height',))
+    var[:] = output['temperature'] - 273.15
+    var.units = 'C'
+    var.long_name = "temperature"
 
-    var = data.createVariable('mean_mixingratio', 'f4', ('height',))
-    var[:] = mean[55:]
-    var.units = climo.variables['mean_mixingratio'].units
-    var.long_name = climo.variables['mean_mixingratio'].long_name
+    var = data.createVariable('waterVapor', 'f4', ('time','height',))
+    var[:] = output['wvmr']
+    var.units = 'g/kg'
+    var.long_name = 'water vapor mixing ratio'
 
-    var = data.createVariable('height2', 'f4', ('height2',))
-    var[:] = climo.variables['height2'][:]
-    var.units = climo.variables['height2'].units
-    var.long_name = climo.variables['height2'].long_name
+    var = data.createVariable('pressure', 'f4', ('time','height',))
+    var[:] = output['pressure']
+    var.units = 'mb'
+    var.long_name = 'air pressure'
 
-    var = data.createVariable('wnum', 'f4', ('wnum',))
-    var[:] = climo.variables['wnum'][:]
-    var.units = climo.variables['wnum'].units
-    var.long_name = climo.variables['wnum'].long_name
+    var = data.createVariable('sigma_temperature', 'f4', ('time','height',))
+    var[:] = output['temperature_sigma']
+    var.units = 'C'
+    var.long_name = '1-sigma uncertainty in temperature'
 
-    var = data.createVariable('delta_od', 'f4', ('wnum',))
-    var[:] = climo.variables['delta_od'][:]
-    var.units = climo.variables['delta_od'].units
-    var.long_name = climo.variables['delta_od'].long_name
+    var = data.createVariable('sigma_waterVapor', 'f4', ('time','height',))
+    var[:] = output['wvmr_sigma']
+    var.units = 'g/kg'
+    var.long_name = '1-sigma uncertainty in water vapor mixing ratio'
 
-    var = data.createVariable('radiance_true', 'f4', ('wnum',))
-    var[:] = climo.variables['radiance_true'][:]
-    var.units = climo.variables['radiance_true'].units
-    var.long_name = climo.variables['radiance_true'].long_name
+    var = data.createVariable('lat', 'f4')
+    var[:] = output['gridpoint_lat']
+    var.units = 'degrees north'
+    var.long_name = 'latitude'
 
-    var = data.createVariable('radiance_fast', 'f4', ('wnum',))
-    var[:] = climo.variables['radiance_fast'][:]
-    var.units = climo.variables['radiance_fast'].units
-    var.long_name = climo.variables['radiance_fast'].long_name
-
-    var = data.createVariable('mean_prior', 'f4', ('height2',))
-    var[:] = mean
-    var.units = climo.variables['mean_prior'].units
-    var.long_name = climo.variables['mean_prior'].long_name
-
-    var = data.createVariable('covariance_prior', 'f4', ('height2','height2',))
-    var[:] = cov
-    var.units = climo.variables['covariance_prior'].units
-    var.long_name = climo.variables['covariance_prior'].long_name
-
-    climo.close()
+    var = data.createVariable('lon', 'f4')
+    var[:] = output['gridpoint_lon']
+    var.units = 'degrees east'
+    var.long_name = 'longitude'
+    
+    data.close()
     
     return priorCDF_filename
 
