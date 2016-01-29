@@ -9,7 +9,7 @@ import platform
 import utils
 
 """
-    Script Name: get_model_prior.py
+    Script Name: get_model_data.py
     
     Contains two primary parsing functions:
     getARMProfiles() - which will parse out the profiles within a specified spatial domain
@@ -19,6 +19,9 @@ import utils
                               
     Also contains two functions that call the parsing functions and control the files that 
     get opened in order to create the model observation files for AERIoe.
+    
+    TODO: Include a function to get the NOMADS RAP data to generate these files for PECAN.
+          Include a comment block for the other three functions in this file.
 """
  
 # Height grid to interpolate the RAP/RUC profiles to:
