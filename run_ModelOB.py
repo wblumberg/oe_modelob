@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-import get_model_prior as gmp
+import get_model_data as gmp
 from netCDF4 import Dataset
 from datetime import datetime, timedelta
 import time
