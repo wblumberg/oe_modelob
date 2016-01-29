@@ -527,12 +527,12 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
         
-    output['temperature'] = temperature
-    output['wvmr'] = wvmr
-    output['temperature_sigma'] = temperature_sigma
-    output['wvmr_sigma'] = wvmr_sigma
+    output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
+    output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
+    output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
+    output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
+    output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
     output['height'] = height_grid
-    output['pressure'] = pressure
     output['paths_to_data'] = paths
     output['gridpoint_lat'] = lat
     output['gridpoint_lon'] = lon
@@ -572,7 +572,8 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     while cur_dt <= upper_bound_dt :
         print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
         dist, point = getARMProfiles(model_data_path, datetime.strftime(cur_dt, '%Y%m%d'), datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, spatial_mesh_size)
-        paths.append(dist['path_to_data'])
+        if dist is not None:
+            paths.append(dist['path_to_data'])
         dists[count] = dist
         points[count] = point
         dts[count] = cur_dt
@@ -600,7 +601,6 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
         except Exception,e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
-            print e
             continue
         
         # Pull out the latitude and longitude point.
@@ -622,17 +622,23 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
         
-    output['temperature'] = temperature
-    output['wvmr'] = wvmr
-    output['temperature_sigma'] = temperature_sigma
-    output['wvmr_sigma'] = wvmr_sigma
+    output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
+    output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
+    output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
+    output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
+    output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
     output['height'] = height_grid
-    output['pressure'] = pressure
     output['paths_to_data'] = paths
     output['gridpoint_lat'] = lat
     output['gridpoint_lon'] = lon
     output['data_type'] = np.ones(len(temperature))
     output['dts'] = dts[temporal_mesh_size:len(dts)-temporal_mesh_size]
+    
+    total_missing = np.ma.count_masked(output['pressure'], axis=0)
+    total = np.ma.count(output['pressure'], axis=0)
+    
+    if total_missing[0] != 0:
+        print "WARNING!  Some files were missing when converting the data.  A total of " + str(total_missing[0]) + ' profiles out of ' + str(len(output['dts'])) + ' are missing!'
     
     return output
 
@@ -750,25 +756,25 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
         wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
-
-    output['temperature'] = temperature
-    output['wvmr'] = wvmr
-    output['temperature_sigma'] = temperature_sigma
-    output['wvmr_sigma'] = wvmr_sigma
+    
+    output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
+    output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
+    output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
+    output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
+    output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
     output['height'] = height_grid
-    output['pressure'] = pressure
     output['paths_to_data'] = paths
     output['gridpoint_lat'] = lat
     output['gridpoint_lon'] = lon
-    output['data_type'] = data_type
-    output['dts'] = np.unique(dts[temporal_mesh_size:len(dts)-temporal_mesh_size])
+    output['data_type'] = np.ones(len(temperature))
+    output['dts'] = dts[temporal_mesh_size:len(dts)-temporal_mesh_size]
    
     return output
 
 
 def makeFile(output):
     """
-        Make the netCDF file!
+        Make the netCDF file containing the model observations!
     """
     epoch_time = date2num(output['dts'], 'seconds since 1979-01-01 00:00:00+00:00')
     priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
