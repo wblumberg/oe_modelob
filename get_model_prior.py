@@ -271,9 +271,10 @@ def getMotherlodeProfiles(yyyymmddhh, time_window, aeri_lat, aeri_lon, size=5):
     # TODO: Figure out the format of the data that gets returned by this function.
     return temps, mxrs, press, type, path
 
-# This the code that gets called by run_prior_gen.py when we want to make a prior out of the
-# ARM RUC/RAP MODEL DATA.
 def getARMModelPrior(model_data_path, climo_prior, yyyymmdd, size, hh, hh_delta, aeri_lon, aeri_lat):
+    '''
+        LEFT OVER CODE THAT CONTROLS WHICH ARM-formatted RAP/RUC FILES GET USED IN THE PRIOR GENERATON
+    '''
     print "This prior is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
     
     dt = datetime.strptime(yyyymmdd + str(hh), '%Y%m%d%H') - timedelta(seconds=int(hh_delta)*60*60)
