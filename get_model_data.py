@@ -776,7 +776,7 @@ def makeFile(output):
     """
         Make the netCDF file containing the model observations!
     """
-    epoch_time = date2num(output['dts'], 'seconds since 1979-01-01 00:00:00+00:00')
+    epoch_time = date2num(output['dts'], 'seconds since 1970-01-01 00:00:00+00:00')
     priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
     print "Saving prior file as: " + priorCDF_filename
 
