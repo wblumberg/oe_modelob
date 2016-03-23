@@ -10,18 +10,24 @@ import utils
 
 """
     Script Name: get_model_data.py
-    
-    Contains two primary parsing functions:
+    Author: Greg Blumberg  OU/CIMMS
+    Last Updated: 23 March 2016
+
+    Contains three primary parsing functions:
     getARMProfiles() - which will parse out the profiles within a specified spatial domain
                        for each ARM-formatted RUC/RAP model file.
     getMotherlodeProfiles() - will parse out the profiles contained within the 13 km RAP grid
                               (used for real-time model observations for AERIoe.)
-                              
+    getNOMADSRAPProfiles() - will parse out the profiles within a specified spatial domain 
+                             using the RAP/RUC data files hosted on the NOAA NOMADs site.
+                             (has very sporatic data gaps sometimes).
+
     Also contains two functions that call the parsing functions and control the files that 
     get opened in order to create the model observation files for AERIoe.
     
-    TODO: Include a function to get the NOMADS RAP data to generate these files for PECAN.
-          Include a comment block for the other three functions in this file.
+    The last function writes the data out to a netCDF file with the corresponding metadata.
+
+    TODO: Include a comment block for the other three functions in this file.
 """
  
 # Height grid to interpolate the RAP/RUC profiles to:
@@ -29,14 +35,11 @@ height_grid = np.arange(0.002, 17, 0.1)
 
 def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     """
-    This function is used to parse through ARM-formatted RAP/RUC analysis files that can be downloaded
-    from the ARM Archive.  These files are primarily used to provide improved upper-air information
-    to the AERIoe retrieval, but for only AERI deployments that took place in the SGP.
+    This function is used to parse through RAP/RUC analysis files that can be downloaded
+    from the NOAA NOMADS site.  These files are primarily used to provide improved upper-air information
+    to the AERIoe retrieval.
     
-    The files it looks for have the regular expression: *syn*yyyymmdd.hh*.cdf
-                                                        *all*yyyymmdd.hh*.cdf
-                                                        
-    Using the yyyymmddhh string, this function searches for ARM-formatted RAP/RUC netCDF files.  
+    Using the yyyymmddhh string, this function searches for RAP/RUC analysis files.  
     Using the aeri_lat, aeri_lon this code will parse out profiles from within the user-specified
     spatial domain. 
     
@@ -47,14 +50,18 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     The parsing also returns the thermodynamic profile from the grid point closest to the AERI location.
     
     TODO: - Dump out the wind profile (u,v) information from this grid point too.
-          - Ensure that this function works for different RAP/RUC resolution and files (e.g 60 km, 40 km)
-    
-    This function in the past has gotten called by getARMModelPrior(), which uses this function to open up
-    several ARM-formatted RUC/RAP files across a certain time window.    
-    
+  
+    Inputs
+    ------
+    yyyymmddhh - a string showing the year, month, date, and hour for the data we want
+    aeri_lat - location of the AERI (latitude)
+    aeri_lon - location of the AERI (longitude)
+    size - number of grid points for the spatial box to calculate the profile uncertainity.
+
     Returns
     -------
-
+    distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
+    point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
     """   
     rap_path = 'http://nomads.ncdc.noaa.gov/thredds/dodsC/rap130/' + yyyymmddhh[:6] + '/' + yyyymmddhh[:8] + \
         '/rap_130_' + yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00_000.grb2'    
@@ -199,9 +206,19 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     This function in the past has gotten called by getARMModelPrior(), which uses this function to open up
     several ARM-formatted RUC/RAP files across a certain time window.    
     
+    Inputs
+    ------
+    rap_path - path to the directory containing the RAP/RUC ARM files
+    yyyymmdd - a string showing the year, month, and date for the data we want
+    hh - a string showing the hour for the data we want
+    aeri_lat - location of the AERI (latitude)
+    aeri_lon - location of the AERI (longitude)
+    size - number of grid points for the spatial box to calculate the profile uncertainity.
+
     Returns
     -------
-
+    distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
+    point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
     """   
     print "\tSearching for \"syn\" files."
     
@@ -343,10 +360,20 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
     TODO: - Include Unidata Siphon compatability (might work better!)
           - Dump out the wind profile (u,v) information from this grid point too.
     
+    Inputs
+    ------
+    yyyymmddhh - a string showing the year, month, date, and hour for the data we want
+    begin_window - beginning index for the temporal window
+    end_window - ending index for the temporal window
+    aeri_lat - location of the AERI (latitude)
+    aeri_lon - location of the AERI (longitude)
+    size - number of grid points for the spatial box to calculate the profile uncertainity.
+
     Returns
     -------
-
-"""
+    distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
+    point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
+    """
     recent_rap_path = 'http://thredds.ucar.edu/thredds/dodsC/grib/NCEP/RAP/CONUS_13km/RR_CONUS_13km_' + \
         yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00.grib2/GC'
     try:
@@ -471,21 +498,30 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     # Save the data into the numpy arrays.
     cur_dt = lower_bound_dt
     count = 0
-    
     paths = []
     while cur_dt <= upper_bound_dt :
         print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
         #dist, point = getARMProfiles(model_data_path, , datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, )
         dist, point = getNOMADSRAPProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), aeri_lat, aeri_lon, spatial_mesh_size)
-        paths.append(dist['path_to_data'])
-        dists[count] = dist
-        points[count] = point
-        dts[count] = cur_dt
+        if dist is not None:
+            paths.append(dist['path_to_data'])
+            dists[count] = dist
+            points[count] = point
+            dts[count] = cur_dt
         cur_dt = cur_dt + delta
         count = count + 1
     
+    # Check to see if any data was able to be found on the server for the date/time specified.
+    if dts.all() is None:
+        print "The program was unable to find any model data for both the timeframe and data source specified in the VIP file."
+        print "Perhaps you should try a different data source?"
+        print "Aborting the program...no file will be created."
+        sys.exit()
+
+    # Create a string showing the paths to the data.
     paths = ', '.join(paths)
     
+    # Intialize the arrays to save the temp/wvmr/pressure data to the netCDF file.
     temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
@@ -493,11 +529,12 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     
     output = {}
-    # Loop over the timeframe.
+    # Loop over the timeframe specified by the user (e.g. 00 to 23 UTC for 20030508).
     for i in np.arange(temporal_mesh_size, len(dts) - temporal_mesh_size, 1):
         index_range = np.arange(i - temporal_mesh_size, i+temporal_mesh_size+1, 1)
-        
+   
         # Try to save the interpolated temperature, water vapor mixing ratio, and pressure profiles
+        # to the array.
         try:
             temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
             wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
@@ -526,7 +563,8 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
         wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
-        
+     
+    # Save all of the information about the T/Q model data to a dictionary.
     output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
     output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
     output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
@@ -544,7 +582,7 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     
 def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
-        LEFT OVER CODE THAT CONTROLS WHICH ARM-formatted RAP/RUC FILES GET USED IN THE PRIOR GENERATON
+        This code opens up the ARM RAP/RUC model files and pulls out the profiles needed to create the RR files.    
     '''
     print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
     delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
@@ -642,9 +680,6 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     
     return output
 
-# This is the code that gets called by run_prior_gen.py when we want to make a prior from
-# ONLINE MOTHERLODE data. It should be used only for realtime prior generation for AERIoe.
-# THIS PART OF THE CODE DOES THE REALTIME DATASET GENERATION
 def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
         Function that gets called when we want to grab data from the Motherlode site.
@@ -775,6 +810,9 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
 def makeFile(output):
     """
         Make the netCDF file containing the model observations!
+        
+        This takes in a dictionary called output, which contains all of the information needed for the netCDF file.
+    
     """
     epoch_time = date2num(output['dts'], 'seconds since 1970-01-01 00:00:00+00:00')
     priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
