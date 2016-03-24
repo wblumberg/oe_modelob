@@ -9,6 +9,9 @@ This script takes in a set of either real-time or archived model data (e.g. ARM-
       - realtime RAP profiles
       - ARM-formatted RUC/RAP files
 
+      Requires:
+            netCDF4-python (conda install netcdf4)
+
       Arguments:
           [1] YYYYMMDD - date of AERI file to run (ex: 20130531)
           [2] VIP file - path to config file (ex: nwc_vip.txt)
