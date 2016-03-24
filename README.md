@@ -18,6 +18,10 @@ This script takes in a set of either real-time or archived model data (e.g. ARM-
        Output:
            Files of the name format of: RRmodelsoundings.YYYYMMDD.HH.LAT.LON.cdf
 
+      Examples:
+            python run_ModelOB.py 20150306 vip.txt 00 00 (creates a file with only the 00 UTC model observation)
+            python run_ModelOB.py 20030508 vip.txt 00 23 (creates a file for the day of 2003-05-08)
+            
 ##VIP File Variables:
 
 The VIP file is similar to the AERIoe format in order to reduce the number of files needed to run AERIoe.
