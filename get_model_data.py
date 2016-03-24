@@ -730,7 +730,15 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
         dts.append(cur_dt)
         cur_dt = cur_dt + delta
         count = count + 1
-    print 
+
+    # Check to see if any data was able to be found on the server for the date/time specified.
+    if len(dts) == 0:
+        print "\nThe program was unable to find any model data for both the timeframe and data source specified in the VIP file."
+        print "Perhaps you should try a different data source?"
+        print "Aborting the program...no file will be created."
+        print "FAILED."
+        sys.exit()
+
     if use_forecast == True:
         print "Unable to find any more analysis data...program will start using forecast data."
         # Go back to the last file that actually existed and had data
@@ -740,7 +748,7 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
             print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt+(delta*(i+1)), '%Y%m%d %H UTC')
             dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), i, i+1, aeri_lat, aeri_lon, spatial_mesh_size)
             if dist is None:
-                print "Unable to find data for:", cur_dt
+                print "Unable to find forecast data for:", cur_dt
                 print "Something funky is going on with the UCAR Motherlode server...contact Greg."
                 print "Maybe try to switch the use_forecast variable to False?"
                 sys.exit()
