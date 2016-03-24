@@ -24,8 +24,8 @@ This script takes in a set of either real-time or archived model data (e.g. ARM-
       Examples:
             python run_ModelOB.py 20150306 vip.txt 00 00 (creates a file with only the 00 UTC model observation)
             python run_ModelOB.py 20030508 vip.txt 00 23 (creates a file for the day of 2003-05-08)
-            
-##VIP File Variables:
+
+#### VIP File Variables:
 
 The VIP file is similar to the AERIoe format in order to reduce the number of files needed to run AERIoe.
 Here are the variables included in the VIP file, along with a description of them:
@@ -41,8 +41,11 @@ Here are the variables included in the VIP file, along with a description of the
          1 - contains analysis data for the CONUS back to 2010, however data outages are sporatic.  
          More recent data may be less sporadic. This data source is recommended when you need model 
          observations outside of the SGP, however it may work for the 2011-2013 NWC AERI deployment.
+         
+         Browse this datastream at this website:
+         http://nomads.ncdc.noaa.gov/thredds/catalog/rap130/
       
-         2 - Contains analysis data for the SGP back to the 90s.  You'll have to download this data 
+         2 - Contains analysis data for the SGP back to the 90s.  You'll have to order this data 
          from the ARM archive however data for this does exist on the ARM cluster and the RAID.  The
          data files need to be hourly and of the format:
       
@@ -55,6 +58,9 @@ Here are the variables included in the VIP file, along with a description of the
               Support for this data type has not been implemented in this program, however it
               may happen in the future since the hybrid levels provide a higher resolution data grid than
               these isobaric files.
+              
+              More information about this data type can be found at:
+              http://www.arm.gov/xdc/xds/ruc
       
               Selection of this data source option requires implementing the "arm_model_dir" VIP variable.
       
@@ -63,6 +69,9 @@ Here are the variables included in the VIP file, along with a description of the
           this data source, the program will use forecast data if analysis data does not exist for the
           time frame specified.  It is recommended that this data source is used for real-time generation
           of RAP Model Observation files.  
+          
+          Browse this datastream at:
+          http://thredds.ucar.edu/thredds/catalog/grib/NCEP/RAP/CONUS_13km/catalog.html
       
       
       Variable: aeri_lat
@@ -99,3 +108,6 @@ Here are the variables included in the VIP file, along with a description of the
       Options: None (string)
       Description:  The directory the model observation files should be written to.
       
+#### Troubleshooting
+
+1. If your selected date/time range has no data, the program should break with an error message saying that there was no data.  It is helpful to check the data source websites (see above under VIP File Variables) to see if the data actually exists on the server.  If it isn't, you're SOL.
