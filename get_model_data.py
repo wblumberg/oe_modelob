@@ -394,7 +394,7 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
     # Ensure that the aeri_lat, aeri_lon variables are floats.
     aeri_lon = float(aeri_lon)
     aeri_lat = float(aeri_lat)
-    
+    size = int(size) 
     # Find the indices for the nearest grid point to the AERI location
     idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
 
@@ -687,7 +687,8 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
     '''
     print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
     delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
-    
+    temporal_mesh_size = int(temporal_mesh_size)
+     
     # Tell the user what the range of data the program will look for.
     print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
     print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
@@ -714,13 +715,14 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
     while cur_dt <= upper_bound_dt :
         print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
         dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), 0, 1, aeri_lat, aeri_lon, spatial_mesh_size)
-        if dist == None:
+        if dist is None:
             # This means that a file couldn't be found for this time.
             # This means that we should break the loop because no data for this hour is available.
             # This also means that we should use forecast data to fill in the distribution
-            print "Unable to find:", cur_dt
+            print "Unable to find data for:", cur_dt
             use_forecast = True
             break
+        print "Using analysis data for the time of:", datetime.strftime(cur_dt, '%Y-%m-%d %H UTC')
         data_type.append(1) # Means that this an analysis
         paths.append(dist['path_to_data'])
         dists[count] = dist
@@ -728,21 +730,27 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
         dts.append(cur_dt)
         cur_dt = cur_dt + delta
         count = count + 1
-    
+    print 
     if use_forecast == True:
+        print "Unable to find any more analysis data...program will start using forecast data."
         # Go back to the last file that actually existed and had data
         cur_dt = cur_dt - delta 
-
         # Get all of the forecast profiles from that file.
-        for i in range(temporal_mesh_size):
+        for i in range(1, 1+int(temporal_mesh_size)):
+            print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt+(delta*(i+1)), '%Y%m%d %H UTC')
             dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), i, i+1, aeri_lat, aeri_lon, spatial_mesh_size)
+            if dist is None:
+                print "Unable to find data for:", cur_dt
+                print "Something funky is going on with the UCAR Motherlode server...contact Greg."
+                print "Maybe try to switch the use_forecast variable to False?"
+                sys.exit()
+            print "Using forecast data for the time of:", datetime.strftime(cur_dt+(delta*(i+1)), '%Y-%m-%d %H UTC')
             data_type.append(2) # Means that this a forecast value
             paths.append(dist['path_to_data'])
             dists[count+i] = dist
             points[count+i] = point
             dts.append(cur_dt+delta)
             count = count + 1
-            
     # Filter out the array elements that were never filled with profile information.
     idx_filter = [i for i, item in enumerate(points) if item is not None]
     points = points[idx_filter]
