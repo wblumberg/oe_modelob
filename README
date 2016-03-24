@@ -30,6 +30,7 @@ Options: 1 - NOAA NOMADS RAP/RUC analysis archive
          3 - 13 km RAP Motherlode UCAR data server (forecast and analysis data)
 Description:
 These three options can be used to generate files for different AERI data.
+
     1 - contains analysis data for the CONUS back to 2010, however data outages are sporatic.  More recent data may be less sporadic. This data source is recommended when you need model observations outside of the SGP, however it may work for the 2011-2013 NWC AERI deployment.
 
     2 - Contains analysis data for the SGP back to the 90s.  You'll have to download this data from the ARM archive however data for this does exist on the ARM cluster and the RAID.  The data files need to be hourly and of the format:
@@ -45,3 +46,35 @@ These three options can be used to generate files for different AERI data.
         Selection of this data source option requires implementing the "arm_model_dir" VIP variable.
 
     3 - Uses analysis and forecast data from the 13 km RAP data located on the UCAR Motherlode server.  This data source semi-realtime data from the last 2 weeks and is updated regularly.  When using this data source, the program will use forecast data if analysis data does not exist for the time frame specified.  It is recommended that this data source is used for real-time generation of RAP Model Observation files.  
+
+
+Variable: aeri_lat
+Required?: YES
+Options: None (float; decimal degrees)
+Description:  This variable is the latitude value of where you'd like the profile center at (e.g. the AERI location)
+
+Variable: aeri_lon
+Required?: YES
+Options: None (float; decimal degrees)
+Description:  This variable is the longitude value of where you'd like the profile center at (e.g. the AERI location)
+
+Variable: arm_model_dir
+Required?: only if data_source=2
+Options: None (string type)
+Description:  The location of the ARM-formatted RAP or RUC data.
+
+Variable: spatial_mesh_size
+Required?: YES
+Options: None (integer)
+Description:  Half of the number of grid points along the permeter of the spatial mesh (e.g. a value of 5 is a 10x10 mesh centered near aeri_lat, aeri_lon.)
+
+Variable: temporal_mesh_size
+Required?: YES
+Options: None (integer)
+Description:  The number of hours of the temporal data window to include in the std calculation (e.g. a value of 2 means the STD calculation will use 5 hours of data.)
+
+Variable: model_ob_output_dir
+Required?: YES
+Options: None (string)
+Description:  The directory the model observation files should be written to.
+
