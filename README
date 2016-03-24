@@ -1,4 +1,4 @@
-Model Observation Script
+##Model Observation Script
 Author: Greg Blumberg OU/CIMMS
 
 Recent changes to AERIoe by Dave Turner have included the option to have a thermodynamic profile be a "Y-vector" observation in the retrieval.  This facilitates the addition of radiosonde/Raman Lidar/DIAL data as inputs into the AERIoe retrieval.  As a consequence, we have decided to remove the AERI model prior concept from our processing and instead use a model thermodynamic profile as another "observation" into the AERIoe retrieval.  This enables a better retrieval in the mid-to-upper atmosphere.  This script will perform the conversions from the model grids into the model-profile netCDF files that AERIoe can now accept as inputs. 
@@ -18,7 +18,7 @@ This script takes in a set of either real-time or archived model data (e.g. ARM-
     Output:
         Files of the name format of: RRmodelsoundings.YYYYMMDD.HH.LAT.LON.cdf
 
-ABOUT THE VIP FILE:
+##VIP File Variables:
 
 The VIP file is similar to the AERIoe format in order to reduce the number of files needed to run AERIoe.
 Here are the variables included in the VIP file, along with a description of them:
