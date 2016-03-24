@@ -110,4 +110,4 @@ Here are the variables included in the VIP file, along with a description of the
       
 #### Troubleshooting
 
-1. If your selected date/time range has no data, the program should break with an error message saying that there was no data.  It is helpful to check the data source websites (see above under VIP File Variables) to see if the data actually exists on the server.  If it isn't, you're SOL.
+1. If your selected date/time range has no data, the program should break with an error message saying that there was no data.  It is helpful to check the data source websites (see above under VIP File Variables) to see if the data actually exists on the server.  If it isn't, you're SOL until I can make some modifications to include other data types for the program to use.
