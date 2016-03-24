@@ -131,7 +131,14 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     center_rh = np.hstack((center_sfc_rh, center_rh[idx_aboveground]))
     center_pres = np.hstack((center_sfc_pres, pres[idx_aboveground]))
     
-    center_q = 1000. * utils.rh2q(center_temp, center_pres*100., center_rh/100.)
+    if np.ma.max(center_pres) > 10000:
+        print "\tPerforming pressure unit check..."
+        # The values are in Pascals
+        center_pres = center_pres/100.
+        sfc_pres = sfc_pres/100.
+        pres = pres/100.
+
+    center_q = 1000. * utils.rh2q(center_temp, 100*center_pres, center_rh/100.)
     
     # Close the ARM-formatted netCDF RAP/RUC file.
     d.close()
