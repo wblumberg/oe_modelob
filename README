@@ -40,9 +40,7 @@ These three options can be used to generate files for different AERI data.
             sgpsynruc20isobX1.c1    04/18/2002  to  05/01/2012  (tested)
             sgpsynrap20plevX1.c1    05/01/2012  to  current     (tested)
 
-        The ARM archive also supports data on the native grid (hybrid levels).  Support for this data type has not been implemented
-        in this program, however it may happen in the future since the hybrid levels provide a higher resolution data grid than
-        these isobaric files.
+        The ARM archive also supports data on the native grid (hybrid levels).  Support for this data type has not been implemented in this program, however it may happen in the future since the hybrid levels provide a higher resolution data grid than these isobaric files.
 
         Selection of this data source option requires implementing the "arm_model_dir" VIP variable.
 
