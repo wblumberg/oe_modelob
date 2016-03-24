@@ -4,6 +4,7 @@ import get_model_data as gmp
 from netCDF4 import Dataset
 from datetime import datetime, timedelta
 import time
+import utils
 
 ###########################################################################
 #
@@ -134,6 +135,9 @@ output['aeri_lon'] = lon
 
 # Get the path to write the converted model grid data into.
 output['output_dir'] = findVIPVariable('output_dir', vip).strip()
+
+# Performs a unit check on the data that is being save and converts it if it fails.
+output = utils.unitCheck(output)
 
 # Output the converted data into a netCDF file.
 gmp.makeFile(output)
