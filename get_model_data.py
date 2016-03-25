@@ -284,7 +284,7 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     center_sfc_temp = d.variables['temp2m'][0,idy,idx]
     sfc_rh = d.variables['rh2m'][0,idy-size:idy+size,idx-size:idx+size]
     center_sfc_rh = d.variables['rh2m'][0,idy,idx]
-   
+    
     # Find the indicies that correspond to the elements of the vertical grid that are above ground.
     idx_aboveground = np.where(center_sfc_hght < center_hght)[0]
         
@@ -325,7 +325,7 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
         
     # Store these arrays into the distribution_profiles dictionary
     distribution_profiles = {}
-    distribution_profiles['temp'] = np.asarray(temps)
+    distribution_profiles['temp'] = np.asarray(temps) 
     distribution_profiles['wvmr'] = np.asarray(mxrs)
     distribution_profiles['pres'] = np.asarray(press)
     distribution_profiles['hght'] = np.asarray(hghts)
@@ -839,7 +839,7 @@ def makeFile(output):
     """
     epoch_time = date2num(output['dts'], 'seconds since 1970-01-01 00:00:00+00:00')
     priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
-    print "Saving prior file as: " + priorCDF_filename
+    print "Saving model observation file as: " + priorCDF_filename
 
     data = Dataset(priorCDF_filename, 'w', 'NETCDF3_CLASSIC')
 
@@ -857,7 +857,7 @@ def makeFile(output):
     data.domain_size = str(2*output['spatial_mesh_size']) + "x" + str(2*output['spatial_mesh_size'])
     data.temporal_size = output['temporal_mesh_size']
 
-    print "Prior generation took place at: ", data.Date_created
+    print "Model observation generation took place at: ", data.Date_created
 
     data.createDimension('time', len(output['temperature']))
     data.createDimension('height', len(output['height']))
