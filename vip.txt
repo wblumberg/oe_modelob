@@ -1,7 +1,7 @@
 data_source = 2 ; Which data to create the file from 2 - ARM-formatted RUC/RAP, 3 - 13 km RAP Motherlode
 aeri_lat = 35.22 ; AERI latitude
 aeri_lon = -97.44 ; AERI longitude
-arm_model_dir = /raid/FRDD/Dave.Turner/data/SGP_BF5/ruc20km/ ; directory path to the ARM-formatted RAP/RUC files
+arm_model_dir = /raid/FRDD/Dave.Turner/data/usa/arm_model_grids/ ; directory path to the ARM-formatted RAP/RUC files
 spatial_mesh_size = 5 ; half of the number of grid points along the perimeter along the spatial mesh
 temporal_mesh_size = 2 ; number of hours of the temporal data window to include in the std calculation
 output_dir = ./ ;
