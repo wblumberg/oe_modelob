@@ -845,7 +845,7 @@ def makeFile(output):
 
     data.Date_created = datetime.strftime(datetime.now(), '%a %b %d %H:%M:%S %Y')
     data.Machine_used = platform.platform()
-    data.model = "RUC/RAP"
+    data.model = "RUC/RAP (" + output['model_src'] + ")"
     #Need to include the web links to the data used to produce these files
     #Need to include the times used to produce this file.
     data.aeri_lat = output['aeri_lat']
