@@ -33,6 +33,7 @@ import utils
 #   This code currently supports making these files from:
 #   - realtime RAP profiles
 #   - ARM-formatted RUC/RAP files
+#   - ICECAPS ECMWF files
 #
 #   Arguments:
 #       [1] YYYYMMDD - date of AERI file to run (ex: 20130531)
@@ -103,6 +104,8 @@ elif data_source == 2:
 elif data_source == 3:
     print "VIP file says to generate model observation files using the RAP MOTHERLODE UCAR datastream."
     print "This datastream contains more recent data and is recommended for realtime AERIoe runs."
+elif data_source == 4:
+    print "VIP file says to generate model observation files using ECMWF model files."
 else:
     print "Invalid value for \"data_source\" variable in the VIP file, aborting program."
     sys.exit()
@@ -130,6 +133,12 @@ elif data_source == 3:
     output = gmp.getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
     output['arm_model_dir'] = 'n/a'
     output['model_src'] = 'UCAR Thredds'
+elif data_source == 4:
+    # Using the ECMWF files for the Greenland ICECAPS AERI files (added 6/15/2016).
+    ecmwf_model_dir = findVIPVariable('arm_model_dir', vip)
+    output = gmp.getECMWFModelObs(ecmwf_model_dir, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, lon, lat)
+    output['arm_model_dir'] = ecmwf_model_dir
+    output['model_src'] = 'ICECAPS ECMWF'
 
 output['spatial_mesh_size'] = spatial_mesh_size
 output['temporal_mesh_size'] = temporal_mesh_size

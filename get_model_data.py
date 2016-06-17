@@ -1,9 +1,9 @@
 from netCDF4 import Dataset, date2num
-#from pylab import *
 import numpy as np
 import sys
 #from mpl_toolkits.basemap import Basemap
 from datetime import datetime, timedelta
+#from pylab import *
 import glob
 import platform
 import utils
@@ -11,9 +11,9 @@ import utils
 """
     Script Name: get_model_data.py
     Author: Greg Blumberg  OU/CIMMS
-    Last Updated: 23 March 2016
+    Last Updated: 15 June 2016
 
-    Contains three primary parsing functions:
+    Contains four primary parsing functions:
     getARMProfiles() - which will parse out the profiles within a specified spatial domain
                        for each ARM-formatted RUC/RAP model file.
     getMotherlodeProfiles() - will parse out the profiles contained within the 13 km RAP grid
@@ -21,6 +21,7 @@ import utils
     getNOMADSRAPProfiles() - will parse out the profiles within a specified spatial domain 
                              using the RAP/RUC data files hosted on the NOAA NOMADs site.
                              (has very sporatic data gaps sometimes).
+    getECMWFProfiles() - will parse out the profiles from the ECMWF data (for Greenland ICECAPS retrievals)
 
     Also contains two functions that call the parsing functions and control the files that 
     get opened in order to create the model observation files for AERIoe.
@@ -344,6 +345,173 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     
     return distribution_profiles, point_profile
 
+
+def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
+    """
+    This function is used to parse through ECMWF files.
+    
+    The files it looks for have the regular expression: *syn*yyyymmdd.hh*.cdf
+                                                        *all*yyyymmdd.hh*.cdf
+                                                        
+    Using the yyyymmddhh string, this function searches for ARM-formatted RAP/RUC netCDF files.  
+    Using the aeri_lat, aeri_lon this code will parse out profiles from within the user-specified
+    spatial domain. 
+    
+    This parsing creates four arrays: temps, mxrs, press, and hghts
+    These arrays are 2-D in the sense that the first index is the profile and the second index is 
+    the vertical grid index of the thermodynamic profile.
+    
+    The parsing also returns the thermodynamic profile from the grid point closest to the AERI location.
+    
+    This function in the past has gotten called by getARMModelPrior(), which uses this function to open up
+    several ARM-formatted RUC/RAP files across a certain time window.    
+    
+    Inputs
+    ------
+    data_path - path to the directory containing the ECMWF files
+    yyyymmdd - a string showing the year, month, and date for the data we want
+    hh - a string showing the hour for the data we want
+    aeri_lat - location of the AERI (latitude)
+    aeri_lon - location of the AERI (longitude)
+    size - number of grid points for the spatial box to calculate the profile uncertainity.
+
+    Returns
+    -------
+    distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
+    point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
+    """   
+    print "\tSearching for \"ECMWF\" files."
+    
+    # If the hour is less than 12, then look for the previous day's run/data by decrementing the yyyymmdd string.
+    true_yyyymmdd = yyyymmdd
+    if int(hh) < 12:
+        dt = datetime.strptime(yyyymmdd, '%Y%m%d') - timedelta(seconds=60*60*24)
+        yyyymmdd = dt.strftime('%Y%m%d')
+    print data_path.strip() + '/*' + yyyymmdd + '12*ml.nc'
+    files_ml = glob.glob(data_path.strip() + '/*' + yyyymmdd + '12*ml.nc') 
+    files_sl = glob.glob(data_path.strip() + '/*' + yyyymmdd + '12*sl.nc') 
+    
+    # If you can't find any ECMWF files filename, return nothing for this datetime/hour
+    if len(files_ml) == 0 or len(files_sl) == 0:
+        print "\tWarning!!!"
+        print "\tECMWF data was not found for the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        return None, None
+    
+    # Ensure that these variables are floats and ints since they may have been passed as strings.
+    aeri_lon = float(aeri_lon)
+    aeri_lat = float(aeri_lat)     
+    size = int(size)
+
+    # Ensure that the file found can be opened up.
+    try:
+         # Tell the user that data has been found
+        print "\tOpening: " + files_ml[0]
+        ml = Dataset(files_ml[0])
+        print "\tOpening: " + files_sl[0]
+        sl = Dataset(files_sl[0])
+    except:
+        # Give messages to the user that the file couldn't be found or opened.
+        print "\tWARNING!!!"
+        print "\tUnable to open up the ECMWF files."
+        print "\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        return None, None
+    
+    forecast_times = ml.variables['forecast_time'][:]
+    first = datetime.strptime(yyyymmdd + '12', '%Y%m%d%H')
+    time_idx = 0
+    for i in range(len(forecast_times)):
+        delta = timedelta(seconds=60*60*(forecast_times[i] - 12)) 
+        if (first + delta).strftime('%Y%m%d%H') == true_yyyymmdd + hh:
+            time_idx = i
+            break
+        else:
+            time_idx = -1
+
+    if time_idx == -1:
+        print "\tNo data available for this time."
+        return None, None
+
+    # Grab the latitude/longitude grid stored in the ARM-formatted model grid file
+    lon = sl.variables['longitude'][:] - 360
+    lat = sl.variables['latitude'][:]
+    lon = np.tile(lon, (len(lat), 1))
+    lat = np.tile(lat, (len(lon[1]), 1)).T
+    
+    hyacoef = np.tile(ml.variables['hybrid_level_a_coeff'][:], (1, lon.shape[0], lon.shape[1]))
+    hyacoef = ml.variables['hybrid_level_a_coeff'][:]
+    hybcoef = ml.variables['hybrid_level_b_coeff'][:]
+    P0 = ml.variables['P0'][:]
+    # Tell the user that the data is being read.
+    print "\tReading in the data and converting it..."
+
+    # Find the indices associated with the grid point nearest to the instrument.
+    idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
+    
+    # Extract and do the inteprolations to get the necessary grids.
+    sfc_pres = np.tile(sl.variables['surface_pressure'][time_idx], (len(hybcoef), 1, 1))
+    sfc_geopotential = sl.variables['surface_geopotential'][time_idx] / 9.81
+    temp = ml.variables['t'][time_idx]
+    q = ml.variables['q'][time_idx] * 1000. # convert to g/kg
+    pres = utils.get3Dpres(hyacoef,hybcoef,P0, sfc_pres)
+    hght = utils.hypsometric_z(pres[::-1,:,:], temp[::-1], q, sfc_geopotential) - sfc_geopotential
+   
+    # Get the profile nearest to the AERI.
+    center_hght = hght[:,idy,idx]/1000.
+    center_temp = temp[::-1,idy,idx]
+    center_pres = pres[::-1,idy,idx]/100.
+    center_q = q[::-1,idy,idx]
+   
+    # Shrink the grid to only include the spatial points we need for the uncertainity calculation
+    pres = pres[:,idy-size:idy+size,idx-size:idx+size]
+    temp =  temp[:,idy-size:idy+size,idx-size:idx+size]
+    q = q[:,idy-size:idy+size,idx-size:idx+size]
+    hght = hght[:,idy-size:idy+size,idx-size:idx+size]
+    
+    # Close the ECMWF file.
+    ml.close()
+    sl.close()
+
+    # Initalize the profile storage arrays.
+    mxrs = []
+    temps = []
+    press = []
+    hghts = []
+    
+    # Loop over the horizontal grid and pull out the vertical profiles at each grid point.
+    for index, x in np.ndenumerate(q[0]):
+        # Merge the 2 meter AGL variables with the rest of the above ground profile.
+        new_hght = hght[:,index[0],index[1]]/1000.
+        new_temp = temp[::-1,index[0],index[1]]-273.15
+        new_pres = pres[::-1,index[0],index[1]]/100.
+        new_q = q[::-1,index[0],index[1]]
+        
+        # Append the full ground to top of model profile to storage arrays.
+        mxrs.append(new_q)
+        temps.append(new_temp)
+        press.append(new_pres)
+        hghts.append(new_hght)
+    
+    # Store these arrays into the distribution_profiles dictionary
+    distribution_profiles = {}
+    distribution_profiles['temp'] = np.asarray(temps) 
+    distribution_profiles['wvmr'] = np.asarray(mxrs)
+    distribution_profiles['pres'] = np.asarray(press)
+    distribution_profiles['hght'] = np.asarray(hghts)
+    distribution_profiles['path_to_data'] = files_ml[0].split('/')[-1] + ':' + files_sl[0].split('/')[-1]
+    
+    # Tell the user how many profiles were found from this:
+    print "\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.'
+    
+    point_profile = {}
+    point_profile['temp'] = center_temp
+    point_profile['wvmr'] = center_q
+    point_profile['pres'] = center_pres
+    point_profile['hght'] = center_hght
+    point_profile['lat'] = lat[idy, idx]
+    point_profile['lon'] = lon[idy, idx]
+    
+    return distribution_profiles, point_profile
+
 def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_lon, size):
     """
     This function is used to parse through RAP data located on the THREDDS Motherlode server
@@ -480,6 +648,22 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
     
     return distribution_profiles, point_profile
 
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#
+#   Divider to separate functions that read in and separate out the data and those functions that walk through the data time span requested...              #
+#
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+#############################################################################################################################################################
+
 def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
         LEFT OVER CODE THAT CONTROLS WHICH ARM-formatted RAP/RUC FILES GET USED IN THE PRIOR GENERATON
@@ -586,6 +770,109 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     
     return output
     
+def getECMWFModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
+    '''
+        This code opens up the ECMWF model files and pulls out the profiles needed to create the model files.    
+    '''
+    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    delta = timedelta(seconds=60*60*1) # 1 hour delta used to iterate throughout the files
+    
+    # Tell the user what the range of data the program will look for.
+    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
+    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+
+    # Determine the temporal bounds of the data we need to collect.
+    lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
+    upper_bound_dt = end_dt + timedelta(seconds=60*60*temporal_mesh_size)
+    
+    # Arrays to store dictionaries 
+    num_times = (upper_bound_dt - lower_bound_dt).seconds * (1./3600.) + (upper_bound_dt - lower_bound_dt).days * 24
+    dists = np.empty(num_times+1, dtype=dict)
+    points = np.empty(num_times+1, dtype=dict)
+    dts = np.empty(num_times+1, dtype=object)
+    
+    # Begin looping over the time frame the observation files encompass.
+    # Save the data into the numpy arrays.
+    cur_dt = lower_bound_dt
+    count = 0
+    
+    paths = []
+    while cur_dt <= upper_bound_dt :
+        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        dist, point = getECMWFProfiles(model_data_path, datetime.strftime(cur_dt, '%Y%m%d'), datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, spatial_mesh_size)
+        if dist is not None:
+            paths.append(dist['path_to_data'])
+        dists[count] = dist
+        points[count] = point
+        dts[count] = cur_dt
+        cur_dt = cur_dt + delta
+        count = count + 1
+    
+    paths = ', '.join(paths)
+    
+    temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    temperature_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    
+    output = {}
+    # Loop over the timeframe.
+    for i in np.arange(temporal_mesh_size, len(dts) - temporal_mesh_size, 1):
+        index_range = np.arange(i - temporal_mesh_size, i+temporal_mesh_size+1, 1)
+        
+        # Try to save the interpolated temperature, water vapor mixing ratio, and pressure profiles
+        try:
+            print points[i]['hght'], points[i]['temp']
+            
+            temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
+            wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
+            pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
+        except Exception,e:
+            # If there's an issue with loading in the data for this time, then this exception will catch it.
+            # this will skip calculating the standard deviation too, because we won't need that.
+            continue
+        
+        # Pull out the latitude and longitude point.
+        lat = points[i]['lat']
+        lon = points[i]['lon']
+        
+        temp_dist = []
+        wvmr_dist = []
+        # Loop over the temporal window we'll be using to calculate the standard deviation.
+        for j in index_range:
+            # Loop over the spatial distribution of profiles for time index j.
+            for k in range(len(dists[i]['temp'])):
+                # Interpolate the profiles and save to the array used in calculating the standard deviation.
+                temp_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['temp'][k]))
+                wvmr_dist.append(np.interp(height_grid, dists[i]['hght'][k], dists[i]['wvmr'][k]))
+        # Calculate the standard deviation profiles for temperature and water vapor mixing ratio and save it.
+        temp_std = np.std(np.asarray(temp_dist), axis=0)
+        wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
+        temperature_sigma[i-temporal_mesh_size,:] = temp_std
+        wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
+        
+    output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
+    output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
+    output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
+    output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
+    output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
+    output['height'] = height_grid
+    output['paths_to_data'] = paths
+    output['gridpoint_lat'] = lat
+    output['gridpoint_lon'] = lon
+    output['data_type'] = np.ones(len(temperature))
+    output['dts'] = dts[temporal_mesh_size:len(dts)-temporal_mesh_size]
+    
+    total_missing = np.ma.count_masked(output['pressure'], axis=0)
+    total = np.ma.count(output['pressure'], axis=0)
+    
+    if total_missing[0] != 0:
+        print "WARNING!  Some files may have been missing when converting the data.  A total of " + str(total_missing[0]) + ' hourly profiles out of ' + str(len(output['dts'])) + ' are missing!'
+    print output['temperature'] 
+    return output
+
+   
     
 def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, aeri_lon, aeri_lat):
     '''
@@ -920,8 +1207,11 @@ def main():
     print "END."
     
 if __name__ == '__main__':
-    aeri_lon = -97
-    aeri_lat = 35
-    print getMotherlodeProfiles('2015022412', 6, aeri_lat, aeri_lon, 10, [10,20, 30])
+    aeri_lon = -40
+    aeri_lat = 30
+    size = 5
+    print getECMWFModelObs('/Users/greg.blumberg/ecmwf/', datetime.strptime('2012072012','%Y%m%d%H'), datetime.strptime('2012072023','%Y%m%d%H'), 2,5,aeri_lon, aeri_lat)
+    #print getECMWFProfiles('/Users/greg.blumberg/ecmwf/', '20120720', '21', aeri_lon, aeri_lat, size)
+    #print getMotherlodeProfiles('2015022412', 6, aeri_lat, aeri_lon, 10, [10,20, 30])
     #main()
 

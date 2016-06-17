@@ -42,3 +42,35 @@ def rh2q(temp, pres, rh):
     e = rh * es
     q = (0.622*e) / ((pres/100.) - e)
     return q
+
+# This function is used to convert from sigma/hybrid coordinates to pressure coordinates.
+def get3Dpres(hbcoefa, hbcoefb, P0, sfc_pres):
+    # hbcoefa(k) ( vertical coord)
+    # hbcoefb(k) ( vertical coord)
+    # P0 - float
+    # sfc_pres(i,j) (2-d grid)
+    # Returns P(i,j,k)
+    pres_arr = np.empty(sfc_pres.shape)
+    for i in range(len(pres_arr)):
+        pres_arr[i] = (hbcoefa[i]*P0) + hbcoefb[i] * sfc_pres[i]
+    return pres_arr
+
+def hypsometric_z(pres_arr, temp_arr, q_arr, sfc_z):
+    new_z = np.empty(pres_arr.shape)
+    new_z[0,:,:] = sfc_z
+    for i in np.ndenumerate(sfc_z):
+        for j in range(1, len(pres_arr)):
+            x_idx = i[0][0]
+            y_idx = i[0][1]
+            
+            mean_t = (temp_arr[j, x_idx, y_idx] + temp_arr[j-1, x_idx, y_idx])/2.
+            z_1 = new_z[j-1,x_idx,y_idx]
+            p_1 = pres_arr[j-1,x_idx,y_idx]
+            p_2 = pres_arr[j,x_idx,y_idx]
+            new_z[j,x_idx,y_idx] = z_1 + (np.log(p_1/p_2) * (287. * mean_t) / (9.81))
+
+    return new_z
+
+
+
+
