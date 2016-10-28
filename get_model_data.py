@@ -32,7 +32,74 @@ import utils
 """
  
 # Height grid to interpolate the RAP/RUC profiles to:
-height_grid = np.arange(0.002, 17, 0.1)
+height_grid = np.concatenate(([0.002, 0.010], np.arange(0.011, 17, 0.1)))
+
+def QC(val):
+    '''
+    Tests if a value is masked.
+    Borrowed from SHARPpy
+    '''
+    if type(val) == type(np.ma.masked): return False
+    return True
+
+def comp2vec(u, v):
+    '''
+        Convert U, V components into direction and magnitude
+        Borrowed from SHARPpy
+        
+        Parameters
+        ----------
+        u : number, array_like
+        U-component of the wind
+        v : number, array_like
+        V-component of the wind
+        missing : number (optional)
+        Optional missing parameter. If not given, assume default missing
+        value from sharppy.sharptab.constants.MISSING
+        Returns
+        -------
+        wdir : number, array_like (same as input)
+        Angle in meteorological degrees
+        wspd : number, array_like (same as input)
+        Magnitudes of wind vector (input units == output units)
+    '''
+    TOL = 1e-10
+    missing = -9999.0
+
+    if not QC(u) or not QC(v):
+        return ma.masked, ma.masked
+
+    u = np.ma.asanyarray(u).astype(np.float64)
+    v = np.ma.asanyarray(v).astype(np.float64)
+    u.set_fill_value(missing)
+    v.set_fill_value(missing)
+    wdir = np.degrees(np.arctan2(-u, -v))
+
+    wdir[np.where(wdir < 0)] = wdir[np.where(wdir < 0)] + 360
+    wdir[np.where(np.fabs(wdir) < TOL)] = 0
+
+    return wdir, mag(u, v)
+
+def mag(u, v):
+    '''
+    Compute the magnitude of a vector from its components
+    Borrowed from SHARPpy
+
+    Parameters
+    ----------
+    u : number, array_like
+    U-component of the wind
+    v : number, array_like
+    V-component of the wind
+    missing : number (optional)
+    Optional missing parameter. If not given, assume default missing
+    value from sharppy.sharptab.constants.MISSING
+    Returns
+    -------
+    mag : number, array_like
+    The magnitude of the vector (units are the same as input)
+    '''
+    return np.ma.sqrt(u**2 + v**2)
 
 def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     """
@@ -276,7 +343,9 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     center_rh = d.variables['rhp'][0,idy,idx,:]
     hght = d.variables['heightgpp'][0,idy-size:idy+size,idx-size:idx+size,:]
     center_hght = d.variables['heightgpp'][0,idy,idx]
-    
+    center_u = d.variables['windup'][0, idy, idx]
+    center_v = d.variables['windvp'][0, idy, idx]
+
     sfc_pres = d.variables['pressuresrf'][0,idy-size:idy+size,idx-size:idx+size]/100. # Convert from Pa to mb
     center_sfc_pres = d.variables['pressuresrf'][0,idy,idx]/100. # Convert from Pa to mb
     sfc_hght = d.variables['heightsrf'][idy-size:idy+size,idx-size:idx+size]
@@ -285,16 +354,22 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     center_sfc_temp = d.variables['temp2m'][0,idy,idx]
     sfc_rh = d.variables['rh2m'][0,idy-size:idy+size,idx-size:idx+size]
     center_sfc_rh = d.variables['rh2m'][0,idy,idx]
-    
+    center_sfc_u = d.variables['windu10m'][0, idy, idx]
+    center_sfc_v = d.variables['windv10m'][0, idy, idx]
+
     # Find the indicies that correspond to the elements of the vertical grid that are above ground.
     idx_aboveground = np.where(center_sfc_hght < center_hght)[0]
-        
+     
+    # Remember that the u and v wind variables are in m/s and also 10 meter AGL, not 2 m AGL.
+    center_u = np.hstack((center_sfc_u, center_u[idx_aboveground]))
+    center_v = np.hstack((center_sfc_v, center_v[idx_aboveground]))
+    center_hght_wnd = (np.hstack((center_sfc_hght+10, center_hght[idx_aboveground])) - center_sfc_hght)/1000.
+    
     # Merge the 2 meter AGL variables with the rest of the above ground profile.
     center_hght = (np.hstack((center_sfc_hght+2, center_hght[idx_aboveground])) - center_sfc_hght)/1000.
     center_temp = np.hstack((center_sfc_temp, center_temp[idx_aboveground]))
     center_rh = np.hstack((center_sfc_rh, center_rh[idx_aboveground]))
     center_pres = np.hstack((center_sfc_pres, pres[idx_aboveground]))
-    
     center_q = 1000. * utils.rh2q(center_temp, center_pres*100., center_rh/100.)
     
     # Close the ARM-formatted netCDF RAP/RUC file.
@@ -340,6 +415,9 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     point_profile['wvmr'] = center_q
     point_profile['pres'] = center_pres
     point_profile['hght'] = center_hght
+    point_profile['hght_wnd'] = center_hght_wnd
+    point_profile['u'] = center_u
+    point_profile['v'] = center_v
     point_profile['lat'] = lat[idy, idx]
     point_profile['lon'] = lon[idy, idx]
     
@@ -917,6 +995,8 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    u = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    v = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     temperature_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     
@@ -930,6 +1010,8 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
             temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
             wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
+            u[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['u'], left=np.ma.masked, right=np.ma.masked)
+            v[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['v'], left=np.ma.masked, right=np.ma.masked)
         except Exception,e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
@@ -953,12 +1035,15 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
         wvmr_std = np.std(np.asarray(wvmr_dist), axis=0)
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
-        
+    
+    wdir, wspd = comp2vec(u, v)
     output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
     output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
     output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
     output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
     output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
+    output['wdir'] = np.ma.masked_invalid(wdir)
+    output['wspd'] = np.ma.masked_invalid(wspd)
     output['height'] = height_grid
     output['paths_to_data'] = paths
     output['gridpoint_lat'] = lat
@@ -1188,6 +1273,16 @@ def makeFile(output):
     var[:] = output['wvmr_sigma']
     var.units = 'g/kg'
     var.long_name = '1-sigma uncertainty in water vapor mixing ratio'
+ 
+    var = data.createVariable('wspd', 'f4', ('time','height',))
+    var[:] = output['wspd']
+    var.units = 'm/s'
+    var.long_name = 'wind speed'
+
+    var = data.createVariable('wdir', 'f4', ('time','height',))
+    var[:] = output['wdir']
+    var.units = 'degrees'
+    var.long_name = 'wind direction'
 
     var = data.createVariable('lat', 'f4')
     var[:] = output['gridpoint_lat']
