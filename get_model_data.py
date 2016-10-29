@@ -11,7 +11,7 @@ import utils
 """
     Script Name: get_model_data.py
     Author: Greg Blumberg  OU/CIMMS
-    Last Updated: 15 June 2016
+    Last Updated: 27 October 2016
 
     Contains four primary parsing functions:
     getARMProfiles() - which will parse out the profiles within a specified spatial domain
@@ -668,14 +668,26 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
     center_sfc_temp = d.variables['Temperature_height_above_ground'][begin_window:end_window,0, idy, idx]
     sfc_rh = d.variables['Relative_humidity_height_above_ground'][begin_window:end_window,0, idy-size:idy+size,idx-size:idx+size]
     center_sfc_rh = d.variables['Relative_humidity_height_above_ground'][begin_window:end_window,0, idy, idx]
-   
-    # Merge the model profile data together to get the thermodynamic profile nearest to the AERI location.
+    
+    u =  d.variables['u-component_of_wind_isobaric'][begin_window:end_window,:,idy,idx] #
+    v =  d.variables['v-component_of_wind_isobaric'][begin_window:end_window,:,idy,idx] # 
+    center_sfc_u = d.variables['u-component_of_wind_height_above_ground'][begin_window:end_window,0, idy, idx]
+    center_sfc_v = d.variables['v-component_of_wind_height_above_ground'][begin_window:end_window,0, idy, idx]
+    
     hght_prof = center_hght[0, :]
     idx_aboveground = np.where(pres < center_sfc_pres[0])[0]
+    
+    # Include wind profile data
+    center_hght_wnd = (np.hstack((center_sfc_hght+10, center_hght[0, idx_aboveground][::-1])) - center_sfc_hght+10)/1000.
+    center_u = np.hstack((center_sfc_u[0], u[0, idx_aboveground][::-1]))
+    center_v = np.hstack((center_sfc_v[0], v[0, idx_aboveground][::-1]))
+
+    # Merge the model profile data together to get the thermodynamic profile nearest to the AERI location.
     center_hght = (np.hstack((center_sfc_hght+2, center_hght[0, idx_aboveground][::-1])) - center_sfc_hght+2)/1000.
     center_temp = np.hstack((center_sfc_temp[0], center_temp[0, idx_aboveground][::-1]))
     center_rh = np.hstack((center_sfc_rh[0], center_rh[0, idx_aboveground][::-1]))
     center_pres = np.hstack((center_sfc_pres[0], pres[idx_aboveground][::-1]))
+    
     center_q = utils.rh2q(center_temp, center_pres, center_rh/100.)*1000.
     
     # Close the 13 km RAP dataset.
@@ -718,6 +730,9 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
     point_profile['wvmr'] = center_q
     point_profile['pres'] = center_pres
     point_profile['hght'] = center_hght
+    point_profile['hght_wnd'] = center_hght_wnd
+    point_profile['u'] = u
+    point_profile['v'] = v
     point_profile['lat'] = ll.variables['lat'][idy, idx]
     point_profile['lon'] = ll.variables['lon'][idy, idx]
     
@@ -1151,6 +1166,8 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
     pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     temperature_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     wvmr_sigma = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    u = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
+    v = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     
     output = {}
     # Loop over the timeframe.
@@ -1162,6 +1179,8 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
             temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
             wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
+            u[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['u'].squeeze(), left=np.ma.masked, right=np.ma.masked)
+            v[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['v'].squeeze(), left=np.ma.masked, right=np.ma.masked)
         except Exception,e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
@@ -1187,11 +1206,14 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
         temperature_sigma[i-temporal_mesh_size,:] = temp_std
         wvmr_sigma[i-temporal_mesh_size,:] = wvmr_std
     
+    wdir, wspd = comp2vec(u, v)
     output['pressure'] = np.ma.masked_where(pressure == 0, pressure)
     output['temperature'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature)
     output['wvmr'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr)
     output['temperature_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), temperature_sigma)
     output['wvmr_sigma'] = np.ma.masked_where(np.ma.getmask(output['pressure']), wvmr_sigma)
+    output['wdir'] = np.ma.masked_invalid(wdir)
+    output['wspd'] = np.ma.masked_invalid(wspd)
     output['height'] = height_grid
     output['paths_to_data'] = paths
     output['gridpoint_lat'] = lat
@@ -1273,16 +1295,19 @@ def makeFile(output):
     var[:] = output['wvmr_sigma']
     var.units = 'g/kg'
     var.long_name = '1-sigma uncertainty in water vapor mixing ratio'
- 
-    var = data.createVariable('wspd', 'f4', ('time','height',))
-    var[:] = output['wspd']
-    var.units = 'm/s'
-    var.long_name = 'wind speed'
+    
+    if 'wspd' in output.keys():
+        var = data.createVariable('wspd', 'f4', ('time','height',))
+        var[:] = output['wspd']
+        var.units = 'm/s'
+        var.long_name = 'wind speed'
 
-    var = data.createVariable('wdir', 'f4', ('time','height',))
-    var[:] = output['wdir']
-    var.units = 'degrees'
-    var.long_name = 'wind direction'
+        var = data.createVariable('wdir', 'f4', ('time','height',))
+        var[:] = output['wdir']
+        var.units = 'degrees'
+        var.long_name = 'wind direction'
+    else:
+        print "WARNING! This RRsounding file will not have any information on the wind profile nearest to the AERI."
 
     var = data.createVariable('lat', 'f4')
     var[:] = output['gridpoint_lat']
