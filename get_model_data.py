@@ -143,12 +143,12 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     try:
         d = Dataset(rap_path)
         # Tell the user that data has been found
-        print "\tFound data: " + rap_path
+        print("\tFound data: " + rap_path)
     except:
         # Give messages to the user that the file couldn't be found or opened.
         # Return error codes.
-        print "\tWARNING!!!"
-        print "\tUnable to find data for the date and hour of: " + yyyymmddhh[:8] + ' ' + yyyymmddhh[8:10] + ' UTC'
+        print("\tWARNING!!!")
+        print("\tUnable to find data for the date and hour of: " + yyyymmddhh[:8] + ' ' + yyyymmddhh[8:10] + ' UTC')
         return None, None
         
     # Open up the 13 km latitude/longitude grid.
@@ -158,7 +158,7 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     ll.close()
     
     # Tell the user that the data is being read.
-    print "\tReading in the data and converting it..."
+    print("\tReading in the data and converting it...")
     
     # Find the indices associated with the grid point nearest to the instrument.
     idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
@@ -200,7 +200,7 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     center_pres = np.hstack((center_sfc_pres, pres[idx_aboveground]))
     
     if np.ma.max(center_pres) > 10000:
-        print "\tPerforming pressure unit check..."
+        print("\tPerforming pressure unit check...")
         # The values are in Pascals
         center_pres = center_pres/100.
         sfc_pres = sfc_pres/100.
@@ -244,7 +244,7 @@ def getNOMADSRAPProfiles(yyyymmddhh, aeri_lat, aeri_lon, size):
     distribution_profiles['path_to_data'] = rap_path
     
     # Tell the user how many profiles were found from this:
-    print "\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.'
+    print("\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.')
     
     point_profile = {}
     point_profile['temp'] = center_temp
@@ -295,14 +295,14 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
     point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
     """   
-    print "\tSearching for \"syn\" files."
+    print("\tSearching for \"syn\" files.")
     
     # Find files that have the "syn" in their filename
     files = glob.glob(rap_path.strip() + '/*syn*' + yyyymmdd + '.' + hh + '*.cdf') 
     
     # If you can't find any files with "syn" in their filename, search for those with the "all"
     if len(files) == 0:
-        print "\tNone, searching for \"all\" files."
+        print("\tNone, searching for \"all\" files.")
         files = glob.glob(rap_path.strip() + '/*all*' + yyyymmdd + '.' + hh + '*.cdf') 
     
     # Ensure that these variables are floats and ints since they may have been passed as strings.
@@ -313,14 +313,14 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     # Ensure that the file found can be opened up.
     try:
          # Tell the user that data has been found
-        print "\t   Found data: " + files[0]
+        print("\t   Found data: " + files[0])
         d = Dataset(files[0])
     except:
         # Give messages to the user that the file couldn't be found or opened.
         # Return error codes.
-        print "\tWARNING!!!"
-        print "\tUnable to find ARM-formatted RAP/RUC dataset."
-        print "\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        print("\tWARNING!!!")
+        print("\tUnable to find ARM-formatted RAP/RUC dataset.")
+        print("\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC')
         return None, None
         
     # Grab the latitude/longitude grid stored in the ARM-formatted model grid file
@@ -328,7 +328,7 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     lat = d.variables['latitude'][:]
    
     # Tell the user that the data is being read.
-    print "\tReading in the data and converting it..."
+    print("\tReading in the data and converting it...")
     
     # Find the indices associated with the grid point nearest to the instrument.
     idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
@@ -408,7 +408,7 @@ def getARMProfiles(rap_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     distribution_profiles['path_to_data'] = files[0].split('/')[-1]
     
     # Tell the user how many profiles were found from this:
-    print "\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.'
+    print("\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.')
     
     point_profile = {}
     point_profile['temp'] = center_temp
@@ -458,21 +458,21 @@ def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     distribution_profiles - a dictionary containing the T/Q/Z/P profiles around the point profile
     point_profile -  a dictionary containing the T/Q/Z/P profiles at the center point (closest to the AERI)
     """   
-    print "\tSearching for \"ECMWF\" files."
+    print("\tSearching for \"ECMWF\" files.")
     
     # If the hour is less than 12, then look for the previous day's run/data by decrementing the yyyymmdd string.
     true_yyyymmdd = yyyymmdd
     if int(hh) < 12:
         dt = datetime.strptime(yyyymmdd, '%Y%m%d') - timedelta(seconds=60*60*24)
         yyyymmdd = dt.strftime('%Y%m%d')
-    print data_path.strip() + '/*' + yyyymmdd + '12*ml.nc'
+    print(data_path.strip() + '/*' + yyyymmdd + '12*ml.nc')
     files_ml = glob.glob(data_path.strip() + '/*' + yyyymmdd + '12*ml.nc') 
     files_sl = glob.glob(data_path.strip() + '/*' + yyyymmdd + '12*sl.nc') 
     
     # If you can't find any ECMWF files filename, return nothing for this datetime/hour
     if len(files_ml) == 0 or len(files_sl) == 0:
-        print "\tWarning!!!"
-        print "\tECMWF data was not found for the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        print("\tWarning!!!")
+        print("\tECMWF data was not found for the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC')
         return None, None
     
     # Ensure that these variables are floats and ints since they may have been passed as strings.
@@ -483,15 +483,15 @@ def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     # Ensure that the file found can be opened up.
     try:
          # Tell the user that data has been found
-        print "\tOpening: " + files_ml[0]
+        print("\tOpening: " + files_ml[0])
         ml = Dataset(files_ml[0])
-        print "\tOpening: " + files_sl[0]
+        print("\tOpening: " + files_sl[0])
         sl = Dataset(files_sl[0])
     except:
         # Give messages to the user that the file couldn't be found or opened.
-        print "\tWARNING!!!"
-        print "\tUnable to open up the ECMWF files."
-        print "\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC'
+        print("\tWARNING!!!")
+        print("\tUnable to open up the ECMWF files.")
+        print("\tFor the date and hour of: " + yyyymmdd + ' ' + hh + ' UTC')
         return None, None
     
     forecast_times = ml.variables['forecast_time'][:]
@@ -506,7 +506,7 @@ def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
             time_idx = -1
 
     if time_idx == -1:
-        print "\tNo data available for this time."
+        print("\tNo data available for this time.")
         return None, None
 
     # Grab the latitude/longitude grid stored in the ARM-formatted model grid file
@@ -520,7 +520,7 @@ def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     hybcoef = ml.variables['hybrid_level_b_coeff'][:]
     P0 = ml.variables['P0'][:]
     # Tell the user that the data is being read.
-    print "\tReading in the data and converting it..."
+    print("\tReading in the data and converting it...")
 
     # Find the indices associated with the grid point nearest to the instrument.
     idy, idx = utils.find_index_of_nearest_xy(lon, lat, aeri_lon, aeri_lat)
@@ -578,7 +578,7 @@ def getECMWFProfiles(data_path, yyyymmdd, hh,  aeri_lon, aeri_lat, size):
     distribution_profiles['path_to_data'] = files_ml[0].split('/')[-1] + ':' + files_sl[0].split('/')[-1]
     
     # Tell the user how many profiles were found from this:
-    print "\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.'
+    print("\tFound " + str(len(distribution_profiles['temp'])) + ' profiles for use.')
     
     point_profile = {}
     point_profile['temp'] = center_temp
@@ -631,12 +631,12 @@ def getMotherlodeProfiles(yyyymmddhh, begin_window, end_window, aeri_lat, aeri_l
         yyyymmddhh[:8] + '_' + yyyymmddhh[8:10] + '00.grib2/GC'
     try:
         d = Dataset(recent_rap_path)
-        print "Found 13 km RAP data for this date on the Motherlode UCAR server."
+        print("Found 13 km RAP data for this date on the Motherlode UCAR server.")
         model_name = "RAP13km"
         path = recent_rap_path
     except:
-        print "No RAP data found for this date on the Motherlode UCAR server."
-        print "Data Path:", recent_rap_path
+        print("No RAP data found for this date on the Motherlode UCAR server.")
+        print("Data Path:", recent_rap_path)
         return None, None
     
     # Read in the terrain data and the lat,lon grid for the 13 km RAP grid.
@@ -761,12 +761,12 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     '''
         LEFT OVER CODE THAT CONTROLS WHICH ARM-formatted RAP/RUC FILES GET USED IN THE PRIOR GENERATON
     '''
-    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    print("This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon))
     delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
     
     # Tell the user what the range of data the program will look for.
-    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
-    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+    print("Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H'))
+    print("Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid.")
 
     # Determine the temporal bounds of the data we need to collect.
     lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
@@ -784,7 +784,7 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     count = 0
     paths = []
     while cur_dt <= upper_bound_dt :
-        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        print("\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC'))
         #dist, point = getARMProfiles(model_data_path, , datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, )
         dist, point = getNOMADSRAPProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), aeri_lat, aeri_lon, spatial_mesh_size)
         if dist is not None:
@@ -797,9 +797,9 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
     
     # Check to see if any data was able to be found on the server for the date/time specified.
     if dts.all() is None:
-        print "The program was unable to find any model data for both the timeframe and data source specified in the VIP file."
-        print "Perhaps you should try a different data source?"
-        print "Aborting the program...no file will be created."
+        print("The program was unable to find any model data for both the timeframe and data source specified in the VIP file.")
+        print("Perhaps you should try a different data source?")
+        print("Aborting the program...no file will be created.")
         sys.exit()
 
     # Create a string showing the paths to the data.
@@ -823,10 +823,10 @@ def getNOMADSModelObs(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size, a
             temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
             wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
-        except Exception,e:
+        except Exception as e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
-            print e
+            print(e)
             continue
         
         # Pull out the latitude and longitude point.
@@ -867,12 +867,12 @@ def getECMWFModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spat
     '''
         This code opens up the ECMWF model files and pulls out the profiles needed to create the model files.    
     '''
-    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    print("This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon))
     delta = timedelta(seconds=60*60*1) # 1 hour delta used to iterate throughout the files
     
     # Tell the user what the range of data the program will look for.
-    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
-    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+    print("Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H'))
+    print("Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid.")
 
     # Determine the temporal bounds of the data we need to collect.
     lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
@@ -891,7 +891,7 @@ def getECMWFModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spat
     
     paths = []
     while cur_dt <= upper_bound_dt :
-        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        print("\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC'))
         dist, point = getECMWFProfiles(model_data_path, datetime.strftime(cur_dt, '%Y%m%d'), datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, spatial_mesh_size)
         if dist is not None:
             paths.append(dist['path_to_data'])
@@ -916,12 +916,12 @@ def getECMWFModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spat
         
         # Try to save the interpolated temperature, water vapor mixing ratio, and pressure profiles
         try:
-            print points[i]['hght'], points[i]['temp']
+            print(points[i]['hght'], points[i]['temp'])
             
             temperature[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['temp'])
             wvmr[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['wvmr'])
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
-        except Exception,e:
+        except Exception as e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
             continue
@@ -961,8 +961,8 @@ def getECMWFModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spat
     total = np.ma.count(output['pressure'], axis=0)
     
     if total_missing[0] != 0:
-        print "WARNING!  Some files may have been missing when converting the data.  A total of " + str(total_missing[0]) + ' hourly profiles out of ' + str(len(output['dts'])) + ' are missing!'
-    print output['temperature'] 
+        print("WARNING!  Some files may have been missing when converting the data.  A total of " + str(total_missing[0]) + ' hourly profiles out of ' + str(len(output['dts'])) + ' are missing!')
+    print(output['temperature']) 
     return output
 
    
@@ -971,12 +971,12 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     '''
         This code opens up the ARM RAP/RUC model files and pulls out the profiles needed to create the RR files.    
     '''
-    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    print("This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon))
     delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
     
     # Tell the user what the range of data the program will look for.
-    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
-    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+    print("Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H'))
+    print("Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid.")
 
     # Determine the temporal bounds of the data we need to collect.
     lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
@@ -984,6 +984,8 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     
     # Arrays to store dictionaries 
     num_times = (upper_bound_dt - lower_bound_dt).seconds * (1./3600.) + (upper_bound_dt - lower_bound_dt).days * 24
+    print(num_times, type(num_times))
+    num_times = int(num_times)
     dists = np.empty(num_times+1, dtype=dict)
     points = np.empty(num_times+1, dtype=dict)
     dts = np.empty(num_times+1, dtype=object)
@@ -995,7 +997,7 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     
     paths = []
     while cur_dt <= upper_bound_dt :
-        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        print("\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC'))
         dist, point = getARMProfiles(model_data_path, datetime.strftime(cur_dt, '%Y%m%d'), datetime.strftime(cur_dt,'%H'),aeri_lon, aeri_lat, spatial_mesh_size)
         if dist is not None:
             paths.append(dist['path_to_data'])
@@ -1006,7 +1008,7 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
         count = count + 1
     
     paths = ', '.join(paths)
-    
+    temporal_mesh_size = int(temporal_mesh_size)
     temperature = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     wvmr = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
     pressure = np.zeros((len(dts[temporal_mesh_size:len(dts)-temporal_mesh_size]), len(height_grid)))
@@ -1027,7 +1029,7 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
             u[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['u'], left=np.ma.masked, right=np.ma.masked)
             v[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['v'], left=np.ma.masked, right=np.ma.masked)
-        except Exception,e:
+        except Exception as e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
             continue
@@ -1070,7 +1072,7 @@ def getARMModelObs(model_data_path, begin_dt, end_dt, temporal_mesh_size, spatia
     total = np.ma.count(output['pressure'], axis=0)
     
     if total_missing[0] != 0:
-        print "WARNING!  Some files were missing when converting the data.  A total of " + str(total_missing[0]) + ' profiles out of ' + str(len(output['dts'])) + ' are missing!'
+        print("WARNING!  Some files were missing when converting the data.  A total of " + str(total_missing[0]) + ' profiles out of ' + str(len(output['dts'])) + ' are missing!')
     
     return output
 
@@ -1079,13 +1081,13 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
         Function that gets called when we want to grab data from the Motherlode site.
         used to generate semi-realtime model profiles for use in AERIoe.
     '''
-    print "This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon)
+    print("This model sounding is spatially centered at: " + str(aeri_lat) + ',' + str(aeri_lon))
     delta = timedelta(seconds=60*60) # Hour delta used to iterate throughout the files
     temporal_mesh_size = int(temporal_mesh_size)
      
     # Tell the user what the range of data the program will look for.
-    print "Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H')
-    print "Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid."
+    print("Will be searching for model netCDF files between: " + datetime.strftime(begin_dt, '%Y-%m-%d %H') + ' and ' + datetime.strftime(end_dt, '%Y-%m-%d %H'))
+    print("Gathering profiles within a " + str(2*spatial_mesh_size) + "x" + str(2*spatial_mesh_size) + " grid.")
 
     # Determine the temporal bounds of the data we need to collect.
     lower_bound_dt = begin_dt - timedelta(seconds=60*60*temporal_mesh_size)
@@ -1107,16 +1109,16 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
     use_forecast = False
     # Get all of the analysis profiles
     while cur_dt <= upper_bound_dt :
-        print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC')
+        print("\nGathering profiles from this date/time: " + datetime.strftime(cur_dt, '%Y%m%d %H UTC'))
         dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), 0, 1, aeri_lat, aeri_lon, spatial_mesh_size)
         if dist is None:
             # This means that a file couldn't be found for this time.
             # This means that we should break the loop because no data for this hour is available.
             # This also means that we should use forecast data to fill in the distribution
-            print "Unable to find data for:", cur_dt
+            print("Unable to find data for:", cur_dt)
             use_forecast = True
             break
-        print "Using analysis data for the time of:", datetime.strftime(cur_dt, '%Y-%m-%d %H UTC')
+        print("Using analysis data for the time of:", datetime.strftime(cur_dt, '%Y-%m-%d %H UTC'))
         data_type.append(1) # Means that this an analysis
         paths.append(dist['path_to_data'])
         dists[count] = dist
@@ -1127,26 +1129,26 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
 
     # Check to see if any data was able to be found on the server for the date/time specified.
     if len(dts) == 0:
-        print "\nThe program was unable to find any model data for both the timeframe and data source specified in the VIP file."
-        print "Perhaps you should try a different data source?"
-        print "Aborting the program...no file will be created."
-        print "FAILED."
+        print("\nThe program was unable to find any model data for both the timeframe and data source specified in the VIP file.")
+        print("Perhaps you should try a different data source?")
+        print("Aborting the program...no file will be created.")
+        print("FAILED.")
         sys.exit()
 
     if use_forecast == True:
-        print "Unable to find any more analysis data...program will start using forecast data."
+        print("Unable to find any more analysis data...program will start using forecast data.")
         # Go back to the last file that actually existed and had data
         cur_dt = cur_dt - delta 
         # Get all of the forecast profiles from that file.
         for i in range(1, 1+int(temporal_mesh_size)):
-            print "\nGathering profiles from this date/time: " + datetime.strftime(cur_dt+(delta*(i+1)), '%Y%m%d %H UTC')
+            print("\nGathering profiles from this date/time: " + datetime.strftime(cur_dt+(delta*(i+1)), '%Y%m%d %H UTC'))
             dist, point = getMotherlodeProfiles(datetime.strftime(cur_dt, '%Y%m%d%H'), i, i+1, aeri_lat, aeri_lon, spatial_mesh_size)
             if dist is None:
-                print "Unable to find forecast data for:", cur_dt
-                print "Something funky is going on with the UCAR Motherlode server...contact Greg."
-                print "Maybe try to switch the use_forecast variable to False?"
+                print("Unable to find forecast data for:", cur_dt)
+                print("Something funky is going on with the UCAR Motherlode server...contact Greg.")
+                print("Maybe try to switch the use_forecast variable to False?")
                 sys.exit()
-            print "Using forecast data for the time of:", datetime.strftime(cur_dt+(delta*(i+1)), '%Y-%m-%d %H UTC')
+            print("Using forecast data for the time of:", datetime.strftime(cur_dt+(delta*(i+1)), '%Y-%m-%d %H UTC'))
             data_type.append(2) # Means that this a forecast value
             paths.append(dist['path_to_data'])
             dists[count+i] = dist
@@ -1181,10 +1183,10 @@ def getRealtimeProfiles(begin_dt, end_dt, temporal_mesh_size, spatial_mesh_size,
             pressure[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght'], points[i]['pres'])
             u[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['u'].squeeze(), left=np.ma.masked, right=np.ma.masked)
             v[i-temporal_mesh_size,:] = np.interp(height_grid, points[i]['hght_wnd'], points[i]['v'].squeeze(), left=np.ma.masked, right=np.ma.masked)
-        except Exception,e:
+        except Exception as e:
             # If there's an issue with loading in the data for this time, then this exception will catch it.
             # this will skip calculating the standard deviation too, because we won't need that.
-            print e
+            print(e)
             continue
         
         # Pull out the latitude and longitude point.
@@ -1233,7 +1235,7 @@ def makeFile(output):
     """
     epoch_time = date2num(output['dts'], 'seconds since 1970-01-01 00:00:00+00:00')
     priorCDF_filename = output['output_dir'] + '/RRmodelsoundings.' + datetime.strftime(output['dts'][0], '%Y%m%d') + '.' + datetime.strftime(output['dts'][0], '%H') + '.' + str(output['aeri_lat']) + '.' + str(output['aeri_lon']) + '.cdf'
-    print "Saving model observation file as: " + priorCDF_filename
+    print("Saving model observation file as: " + priorCDF_filename)
 
     data = Dataset(priorCDF_filename, 'w', 'NETCDF3_CLASSIC')
 
@@ -1251,7 +1253,7 @@ def makeFile(output):
     data.domain_size = str(2*output['spatial_mesh_size']) + "x" + str(2*output['spatial_mesh_size'])
     data.temporal_size = output['temporal_mesh_size']
 
-    print "Model observation generation took place at: ", data.Date_created
+    print("Model observation generation took place at: ", data.Date_created)
 
     data.createDimension('time', len(output['temperature']))
     data.createDimension('height', len(output['height']))
@@ -1296,7 +1298,7 @@ def makeFile(output):
     var.units = 'g/kg'
     var.long_name = '1-sigma uncertainty in water vapor mixing ratio'
     
-    if 'wspd' in output.keys():
+    if 'wspd' in list(output.keys()):
         var = data.createVariable('wspd', 'f4', ('time','height',))
         var[:] = output['wspd']
         var.units = 'm/s'
@@ -1307,7 +1309,7 @@ def makeFile(output):
         var.units = 'degrees'
         var.long_name = 'wind direction'
     else:
-        print "WARNING! This RRsounding file will not have any information on the wind profile nearest to the AERI."
+        print("WARNING! This RRsounding file will not have any information on the wind profile nearest to the AERI.")
 
     var = data.createVariable('lat', 'f4')
     var[:] = output['gridpoint_lat']
@@ -1324,13 +1326,13 @@ def makeFile(output):
     return priorCDF_filename
 
 def main():
-    print "END."
+    print("END.")
     
 if __name__ == '__main__':
     aeri_lon = -40
     aeri_lat = 30
     size = 5
-    print getECMWFModelObs('/Users/greg.blumberg/ecmwf/', datetime.strptime('2012072012','%Y%m%d%H'), datetime.strptime('2012072023','%Y%m%d%H'), 2,5,aeri_lon, aeri_lat)
+    print(getECMWFModelObs('/Users/greg.blumberg/ecmwf/', datetime.strptime('2012072012','%Y%m%d%H'), datetime.strptime('2012072023','%Y%m%d%H'), 2,5,aeri_lon, aeri_lat))
     #print getECMWFProfiles('/Users/greg.blumberg/ecmwf/', '20120720', '21', aeri_lon, aeri_lat, size)
     #print getMotherlodeProfiles('2015022412', 6, aeri_lat, aeri_lon, 10, [10,20, 30])
     #main()

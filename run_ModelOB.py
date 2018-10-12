@@ -60,7 +60,7 @@ def findVIPVariable(variable, filename):
         datas = data.split(";")
         string = datas[0].replace('=', '')
     except:
-        print "Could not read variable: \"" + variable + '\" from file: ' + filename
+        print("Could not read variable: \"" + variable + '\" from file: ' + filename)
         sys.exit()
 
     try: 
@@ -68,11 +68,11 @@ def findVIPVariable(variable, filename):
     except:
         return string
     
-print "Starting generation of model grid \"observation\" files for use in AERIoe."
+print("Starting generation of model grid \"observation\" files for use in AERIoe.")
 
 # Exit the program if the user didn't put in enough command line arguments
 if len(sys.argv) != 5:
-    print "Too few arguments in the command line, aborting."
+    print("Too few arguments in the command line, aborting.")
     sys.exit() 
     
 # Load in the command line arguments.
@@ -83,11 +83,11 @@ ehour = sys.argv[4] # What should the ending hour of the output file be?
 
 # Exit the program if the YYYYMMDD argument isn't formatted correctly.
 if len(yyyymmdd) != 8:
-    print "YYYYMMDD argument not formatted correctly. Aborting."
+    print("YYYYMMDD argument not formatted correctly. Aborting.")
     sys.exit()
 
  
-print "Reading in the VIP variables..."
+print("Reading in the VIP variables...")
 # Hardcoding these for debugging.
 data_source = findVIPVariable('data_source', vip)
 lat = findVIPVariable("aeri_lat", vip)
@@ -97,24 +97,24 @@ spatial_mesh_size = findVIPVariable('spatial_mesh_size', vip)
 
 ### Select the data source to generate the observation files.
 if data_source == 1:
-    print "VIP file says to generate model observation files using the 13 km RAP historical data from the NOAA NOMADS server."
-    print "WARNING! Files are sometimes missing in random places on this server."
+    print("VIP file says to generate model observation files using the 13 km RAP historical data from the NOAA NOMADS server.")
+    print("WARNING! Files are sometimes missing in random places on this server.")
 elif data_source == 2:
-    print "VIP file says to generate model observation files using ARM-formatted RUC/RAP files."
+    print("VIP file says to generate model observation files using ARM-formatted RUC/RAP files.")
 elif data_source == 3:
-    print "VIP file says to generate model observation files using the RAP MOTHERLODE UCAR datastream."
-    print "This datastream contains more recent data and is recommended for realtime AERIoe runs."
+    print("VIP file says to generate model observation files using the RAP MOTHERLODE UCAR datastream.")
+    print("This datastream contains more recent data and is recommended for realtime AERIoe runs.")
 elif data_source == 4:
-    print "VIP file says to generate model observation files using ECMWF model files."
+    print("VIP file says to generate model observation files using ECMWF model files.")
 else:
-    print "Invalid value for \"data_source\" variable in the VIP file, aborting program."
+    print("Invalid value for \"data_source\" variable in the VIP file, aborting program.")
     sys.exit()
 
 # Convert the date/time strings into datetime objects for easier date/time manipulation
 begin_dt = datetime.strptime(yyyymmdd + bhour, '%Y%m%d%H')
 end_dt = datetime.strptime(yyyymmdd + ehour, '%Y%m%d%H')
 
-print "Going to generate a model observation file for the times of: " + datetime.strftime(begin_dt, '%Y-%m-%d %H UTC') + ' to ' + datetime.strftime(end_dt, '%Y-%m-%d %H UTC')
+print("Going to generate a model observation file for the times of: " + datetime.strftime(begin_dt, '%Y-%m-%d %H UTC') + ' to ' + datetime.strftime(end_dt, '%Y-%m-%d %H UTC'))
 
 if data_source == 1:
     # Using RUC/RAP historical data from the NOAA NOMADS server."
@@ -154,5 +154,5 @@ output = utils.unitCheck(output)
 # Output the converted data into a netCDF file.
 gmp.makeFile(output)
 
-print "DONE."
+print("DONE.")
 

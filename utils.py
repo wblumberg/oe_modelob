@@ -3,11 +3,11 @@ import sys
 
 # This function performs a unit check on the profiles and makes sure they are correct.
 def unitCheck(prof_data):
-    print "Performing unit tests on the data collected by the program..."
+    print("Performing unit tests on the data collected by the program...")
     # Check the pressure value
     if np.ma.max(prof_data['pressure']) > 10000:
         # Convert from Pascals to mb
-        print "\tThe values in the pressure array are greater than 10000, let's convert to mb from Pascals..."
+        print("\tThe values in the pressure array are greater than 10000, let's convert to mb from Pascals...")
         prof_data['pressure'] = prof_data['pressure'] / 100. 
 #    if len(np.ma.where(prof_data['wvmr'] < 0.01)[1]) / float(len(prof_data['wvmr'][0])) > .7:
 #        print "\tThere might be a unit error for the water vapor mixing ratio profile...the values are too small...converting..."
